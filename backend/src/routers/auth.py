@@ -21,7 +21,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-@limiter.limit("5/minute")
+@limiter.limit("10/minute")
 async def register(request: Request, payload: UserRegister, db: AsyncSession = Depends(get_db)):
     """Register a new user and return a JWT token. Rate limit: 5/min per IP."""
     existing = await get_user_by_email(db, payload.email)

@@ -17,7 +17,7 @@ async function handleRegister() {
     await register(email.value, password.value, displayName.value || undefined)
     router.push('/onboarding')
   } catch (e: any) {
-    error.value = e.response?.data?.detail || '注册失败'
+    error.value = e.response?.data?.detail || e.response?.data?.error || '注册失败'
   } finally {
     loading.value = false
   }
