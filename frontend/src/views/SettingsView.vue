@@ -7,11 +7,12 @@ interface Settings {
   ai_api_key_masked: string | null
   ai_base_url: string | null
   ai_model: string | null
+  s2_api_key_masked: string | null
 }
 
 const isLoggedIn = () => !!auth.token
 
-const settings = ref<Settings>({ ai_api_key_masked: null, ai_base_url: null, ai_model: null })
+const settings = ref<Settings>({ ai_api_key_masked: null, ai_base_url: null, ai_model: null, s2_api_key_masked: null })
 const loading = ref(true)
 const saving = ref(false)
 const message = ref('')
@@ -21,6 +22,7 @@ const form = ref({
   ai_api_key: '',
   ai_base_url: '',
   ai_model: '',
+  s2_api_key: '',
 })
 
 onMounted(async () => {
@@ -62,6 +64,8 @@ async function saveSettings() {
     else payload.ai_base_url = null
     if (form.value.ai_model) payload.ai_model = form.value.ai_model
     else payload.ai_model = null
+    if (form.value.s2_api_key) payload.s2_api_key = form.value.s2_api_key
+    else payload.s2_api_key = null
 
     try {
       const { data } = await api.put('/auth/settings', payload)
@@ -117,7 +121,7 @@ const modelPresets = [
       <div>
         <label class="block text-sm text-zinc-400 mb-1">API Key</label>
         <input v-model="form.ai_api_key" type="password"
-          :placeholder="settings.ai_api_key_masked ? `已设置 (${settings.ai_api_key_masked})` : 'sk-...'"
+          :placeholder="settings.ai_api_key_masked ? '已设置 (' + settings.ai_api_key_masked + ')' : 'sk-...'"
           class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition" />
         <p class="text-xs text-zinc-600 mt-1">留空保持当前设置不变</p>
       </div>
@@ -150,6 +154,17 @@ const modelPresets = [
           当前：
           <template v-if="isLoggedIn()">{{ settings.ai_model || '服务器默认 (deepseek-chat)' }}</template>
           <template v-else>{{ form.ai_model || 'deepseek-chat' }}</template>
+        </p>
+      </div>
+
+      <!-- S2 API Key -->
+      <div>
+        <label class="block text-sm text-zinc-400 mb-1">Semantic Scholar API Key <span class="text-zinc-600">（可选，提高搜索限额）</span></label>
+        <input v-model="form.s2_api_key" type="password"
+          :placeholder="settings.s2_api_key_masked ? '已设置 (' + settings.s2_api_key_masked + ')' : '留空则仅使用 arXiv 搜索'"
+          class="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition" />
+        <p class="text-xs text-zinc-600 mt-1">
+          <a href="https://www.semanticscholar.org/product/api#api-key-form" target="_blank" class="text-blue-400 hover:underline">免费获取</a>，留空则仅使用 arXiv 搜索
         </p>
       </div>
 
