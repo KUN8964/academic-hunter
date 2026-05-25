@@ -230,3 +230,4 @@ class PublicPaperItem(BaseModel):
 class PublicSearchResponse(BaseModel):
     papers: list[PublicPaperItem]
     total: int
+    warning: str = ""

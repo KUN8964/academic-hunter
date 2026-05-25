@@ -39,6 +39,7 @@ interface Paper {
 }
 const papers = ref<Paper[]>([])
 const totalPapers = ref(0)
+const searchWarning = ref('')
 
 function saveKeyAndContinue() {
   if (!apiKey.value.trim()) return
@@ -86,6 +87,7 @@ async function searchPapers() {
     })
     papers.value = data.papers
     totalPapers.value = data.total
+    searchWarning.value = data.warning || ''
     step.value = 'papers'
   } catch (e: any) {
     error.value = '论文搜索失败，请重试'
@@ -217,6 +219,12 @@ const selectedCount = computed(() => researchers.value.filter(r => r.selected).l
       </div>
 
       <p v-if="error" class="text-red-400 text-sm mb-4">{{ error }}</p>
+      <p v-if="searchWarning" class="text-amber-400 text-sm bg-amber-950/20 border border-amber-900/30 rounded-lg p-3 mb-4">{{ searchWarning }}</p>
+
+      <div v-if="totalPapers === 0 && !searchWarning" class="text-center py-16 text-zinc-500">
+        <p class="text-lg mb-2">未找到相关论文</p>
+        <p class="text-sm">试试用英文描述研究方向，或缩短关键词重试</p>
+      </div>
 
       <div class="space-y-3">
         <div v-for="paper in papers" :key="paper.url"
