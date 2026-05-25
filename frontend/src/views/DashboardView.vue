@@ -40,20 +40,41 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+const runStatus = ref('')
+const runProgress = ref(0)
 
 async function runPipeline() {
   running.value = true
+  runStatus.value = '正在搜索 arXiv...'
+  runProgress.value = 10
   try {
     await api.post('/pipeline/run')
-    // Brief wait then reload briefs
-    setTimeout(async () => {
+    // Poll for briefs every 3 seconds, up to 30s
+    runStatus.value = '正在评分和生成简报...'
+    runProgress.value = 50
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 3000))
+      runProgress.value = 50 + i * 5
+      const { data } = await api.get('/pipeline/briefs')
+      if (data.length > briefs.value.length) {
+        briefs.value = data
+        runStatus.value = '完成！'
+        runProgress.value = 100
+        break
+      }
+      runStatus.value = `等待中... (${(i + 1) * 3}s)`
+    }
+    if (briefs.value.length === 0) {
+      // Final attempt
       const { data } = await api.get('/pipeline/briefs')
       briefs.value = data
-      running.value = false
-    }, 3000)
+      runStatus.value = briefs.value.length > 0 ? '完成！' : '未找到新论文，请确认订阅有关键词'
+    }
   } catch {
+    runStatus.value = 'Pipeline 执行失败'
+  } finally {
     running.value = false
+    setTimeout(() => { runStatus.value = ''; runProgress.value = 0 }, 5000)
   }
 }
 
@@ -75,6 +96,17 @@ function goOnboarding() {
           class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition">
           + 新建订阅
         </button>
+      </div>
+    </div>
+
+    <!-- Pipeline progress -->
+    <div v-if="runStatus" class="mb-6 p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm text-zinc-300">{{ runStatus }}</span>
+        <span class="text-xs text-zinc-500">{{ runProgress }}%</span>
+      </div>
+      <div class="w-full bg-zinc-800 rounded-full h-1.5">
+        <div class="bg-green-500 h-1.5 rounded-full transition-all duration-500" :style="{ width: runProgress + '%' }"></div>
       </div>
     </div>
 

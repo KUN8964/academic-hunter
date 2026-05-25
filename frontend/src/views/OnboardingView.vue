@@ -40,9 +40,10 @@ async function confirmAndCreate() {
   loading.value = true
   error.value = ''
   try {
-    // Create topic subscription
+    // Create topic subscription with AI keywords
     await api.post('/subscriptions/topics', {
       query_text: queryText.value.trim(),
+      ai_keywords: aiKeywords.value,
     })
 
     // Create researcher subscriptions

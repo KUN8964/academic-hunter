@@ -64,6 +64,7 @@ class UserSettingsResponse(BaseModel):
 
 class TopicSubscriptionCreate(BaseModel):
     query_text: str
+    ai_keywords: list[str] = []
 
 
 class TopicSubscriptionUpdate(BaseModel):

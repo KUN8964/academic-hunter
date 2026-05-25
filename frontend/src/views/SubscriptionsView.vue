@@ -27,6 +27,7 @@ const briefs = ref<Brief[]>([])
 const loading = ref(true)
 const running = ref(false)
 const runMsg = ref('')
+const runProgress = ref(0)
 
 onMounted(async () => {
   await loadAll()
@@ -50,13 +51,35 @@ async function loadAll() {
 
 async function triggerPipeline() {
   running.value = true
-  runMsg.value = 'Pipeline 已启动，正在后台搜索论文...'
+  runMsg.value = '正在搜索 arXiv + Semantic Scholar...'
+  runProgress.value = 10
   try {
     await api.post('/pipeline/run')
+    runMsg.value = '正在评分和生成简报...'
+    runProgress.value = 50
+    const prevCount = briefs.value.length
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 3000))
+      runProgress.value = 50 + i * 5
+      const { data } = await api.get('/pipeline/briefs')
+      if (data.length > prevCount) {
+        briefs.value = data
+        runMsg.value = `完成！新增 ${data.length - prevCount} 份简报`
+        runProgress.value = 100
+        break
+      }
+      runMsg.value = `等待中... (${(i + 1) * 3}s)`
+    }
+    if (briefs.value.length === prevCount) {
+      const { data } = await api.get('/pipeline/briefs')
+      briefs.value = data
+      runMsg.value = briefs.value.length > prevCount ? '完成！' : '未找到新论文，请确认订阅有关键词'
+    }
   } catch (e: any) {
     runMsg.value = '启动失败: ' + (e.response?.data?.detail || '未知错误')
   }
   running.value = false
+  setTimeout(() => { runMsg.value = ''; runProgress.value = 0 }, 5000)
 }
 
 async function toggleTopic(sub: Sub) {
@@ -102,7 +125,10 @@ function getSubName(brief: Brief): string {
       </button>
     </div>
 
-    <p v-if="runMsg" class="text-sm text-green-400 mb-4">{{ runMsg }}</p>
+    <p v-if="runMsg" class="text-sm text-green-400 mb-4">
+      {{ runMsg }}
+      <span v-if="runProgress > 0 && runProgress < 100" class="text-zinc-500 ml-2">{{ runProgress }}%</span>
+    </p>
 
     <!-- Topic -->
     <section class="mb-10">
