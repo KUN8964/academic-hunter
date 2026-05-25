@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { auth, getGuestConfig, setGuestConfig } from '../stores/auth'
 import api from '../api'
@@ -25,7 +25,7 @@ const loading = ref(false)
 const error = ref('')
 const keywords = ref<string[]>([])
 const subfields = ref<string[]>([])
-const researchers = ref<any[]>([])
+const researchers = ref<{ name: string; selected: boolean }[]>([])
 
 // Paper search results
 interface Paper {
@@ -60,7 +60,10 @@ async function doExpand() {
     })
     keywords.value = data.ai_keywords || []
     subfields.value = data.suggested_subfields || []
-    researchers.value = data.suggested_researchers || []
+    researchers.value = (data.suggested_researchers || []).map((r: any) => ({
+      name: r.name,
+      selected: true,
+    }))
     step.value = 'expand'
   } catch (e: any) {
     error.value = e.response?.data?.detail || 'AI 调用失败，请检查 API Key'
@@ -105,6 +108,12 @@ function truncate(s: string | null, n: number) {
   if (!s) return ''
   return s.length > n ? s.slice(0, n) + '...' : s
 }
+
+function toggleResearcher(index: number) {
+  researchers.value[index].selected = !researchers.value[index].selected
+}
+
+const selectedCount = computed(() => researchers.value.filter(r => r.selected).length)
 </script>
 
 <template>
@@ -177,11 +186,14 @@ function truncate(s: string | null, n: number) {
         </div>
       </div>
       <div v-if="researchers.length" class="mb-8">
-        <p class="text-sm text-zinc-400 mb-2">建议关注的研究者：</p>
-        <div class="space-y-2">
-          <div v-for="r in researchers" :key="r.name" class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-            <span class="text-white text-sm">{{ r.name }}</span>
-          </div>
+        <p class="text-sm text-zinc-400 mb-2">建议关注的研究者 <span class="text-zinc-600">(已选 {{ selectedCount }}/{{ researchers.length }})</span>：</p>
+        <div class="space-y-1.5">
+          <label v-for="(r, i) in researchers" :key="r.name"
+            class="flex items-center gap-3 p-2.5 bg-zinc-900 border border-zinc-800 rounded-lg cursor-pointer hover:border-zinc-700 transition">
+            <input type="checkbox" :checked="r.selected" @change="toggleResearcher(i)"
+              class="w-4 h-4 rounded bg-zinc-800 border-zinc-600 text-blue-600 focus:ring-blue-600" />
+            <span :class="r.selected ? 'text-white' : 'text-zinc-500'" class="text-sm">{{ r.name }}</span>
+          </label>
         </div>
       </div>
 
