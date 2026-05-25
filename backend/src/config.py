@@ -1,18 +1,44 @@
 """Application configuration loaded from environment variables."""
 
+import secrets
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Academic Hunter configuration."""
+    """Academic Hunter configuration.
+
+    All secrets MUST be set via environment variables or .env file.
+    No hardcoded defaults for credentials — fail fast if missing.
+    """
 
     # Database
-    database_url: str = "postgresql+asyncpg://hunter:hunter@localhost:5432/academic_hunter"
+    database_url: str = ""
 
     # JWT
-    jwt_secret: str = "change-me-in-production-use-a-long-random-string"
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def validate_jwt_secret(cls, v: str) -> str:
+        if not v or v in ("", "change-me-in-production-use-a-long-random-string"):
+            raise ValueError(
+                "JWT_SECRET must be set to a strong random string. "
+                "Generate one: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
+        if len(v) < 32:
+            raise ValueError("JWT_SECRET must be at least 32 characters")
+        return v
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        if not v:
+            raise ValueError("DATABASE_URL must be set")
+        return v
 
     # DeepSeek AI
     deepseek_api_key: str = ""
@@ -37,6 +63,9 @@ class Settings(BaseSettings):
     # NCBI / PubMed
     ncbi_api_key: str = ""
     ncbi_email: str = ""
+
+    # CORS
+    cors_origins: str = "http://localhost:5173,http://localhost:3000"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

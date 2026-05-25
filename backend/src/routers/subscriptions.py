@@ -33,6 +33,11 @@ from ..services.subscriptions import (
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
 
+def _get_user_ai(current_user: User = Depends(get_current_user)) -> AIService:
+    """Dependency: create an AIService configured for the current user."""
+    return AIService.from_user(current_user)
+
+
 # ── Topic Subscriptions ──
 
 @router.get("/topics", response_model=list[TopicSubscriptionResponse])
@@ -165,9 +170,9 @@ async def delete_researcher_sub(
 async def expand_topic(
     payload: OnboardingStartRequest,
     current_user: User = Depends(get_current_user),
+    ai: AIService = Depends(_get_user_ai),
 ):
     """AI expands a natural language query into keywords, subfields, and suggested researchers."""
-    ai = AIService()
     try:
         result = await ai.expand_topic(payload.query_text)
     except Exception:

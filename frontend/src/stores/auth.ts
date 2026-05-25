@@ -1,5 +1,5 @@
-import { reactive } from 'vue'
-import api from './api'
+import { reactive, computed } from 'vue'
+import api from '../api'
 
 interface User {
   id: string
@@ -18,6 +18,27 @@ export const auth = reactive<AuthState>({
   token: localStorage.getItem('token'),
   loading: false,
 })
+
+// Guest mode: API key stored in localStorage, no account needed
+export function getGuestConfig() {
+  return {
+    ai_api_key: localStorage.getItem('guest_api_key') || '',
+    ai_base_url: localStorage.getItem('guest_base_url') || '',
+    ai_model: localStorage.getItem('guest_model') || '',
+  }
+}
+
+export function setGuestConfig(key: string, baseUrl: string, model: string) {
+  localStorage.setItem('guest_api_key', key)
+  if (baseUrl) localStorage.setItem('guest_base_url', baseUrl)
+  else localStorage.removeItem('guest_base_url')
+  if (model) localStorage.setItem('guest_model', model)
+  else localStorage.removeItem('guest_model')
+}
+
+export const isGuest = computed(() => !auth.token && !!localStorage.getItem('guest_api_key'))
+
+// ── Auth actions ──
 
 export async function login(email: string, password: string) {
   const { data } = await api.post('/auth/login', { email, password })

@@ -1,14 +1,14 @@
 """Pydantic schemas for API request/response validation."""
 
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 # ── Auth ──
 
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=8, description="Minimum 8 characters")
     display_name: str | None = None
 
 
@@ -27,6 +27,35 @@ class UserResponse(BaseModel):
     email: str
     display_name: str | None
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UserSettingsUpdate(BaseModel):
+    """User-updatable AI provider configuration. All fields optional — only sent fields are changed."""
+
+    ai_api_key: str | None = None
+    ai_base_url: str | None = None
+    ai_model: str | None = None
+
+
+class UserSettingsResponse(BaseModel):
+    """User's AI settings. API key is masked for security (only last 4 chars shown)."""
+
+    ai_api_key_masked: str | None = None
+    ai_base_url: str | None = None
+    ai_model: str | None = None
+
+    @classmethod
+    def from_user(cls, user) -> "UserSettingsResponse":
+        masked = None
+        if user.ai_api_key:
+            masked = "sk-..." + user.ai_api_key[-4:] if len(user.ai_api_key) > 4 else "****"
+        return cls(
+            ai_api_key_masked=masked,
+            ai_base_url=user.ai_base_url,
+            ai_model=user.ai_model,
+        )
 
     model_config = {"from_attributes": True}
 
@@ -161,6 +190,10 @@ class SearchResponse(BaseModel):
 
 class OnboardingStartRequest(BaseModel):
     query_text: str
+    # Optional AI provider config for public (no-login) usage
+    ai_api_key: str = ""
+    ai_base_url: str = ""
+    ai_model: str = ""
 
 
 class OnboardingStartResponse(BaseModel):

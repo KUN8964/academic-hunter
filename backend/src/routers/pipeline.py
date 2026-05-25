@@ -1,12 +1,13 @@
 """Pipeline and brief routers."""
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database import get_db
+from ..database import async_session, get_db
 from ..models.models import DailyBrief, User
 from ..schemas import DailyBriefResponse
+from ..services.ai import AIService
 from ..services.auth_middleware import get_current_user
 from ..services.pipeline import PipelineService
 
@@ -17,16 +18,20 @@ router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 async def trigger_daily_run(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
 ):
-    """Trigger the daily pipeline run for the current user."""
-    pipeline = PipelineService(db)
+    """Trigger the daily pipeline run for the current user (async background)."""
+    user_id = current_user.id
 
     async def _run():
-        async with db.bind.connect() as conn:
-            async with AsyncSession(conn) as session:
-                svc = PipelineService(session)
-                await svc.run_daily_for_all(current_user.id)
+        async with async_session() as session:
+            # Reload user in the background session to get fresh AI config
+            result = await session.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one_or_none()
+            if user is None:
+                return
+            ai = AIService.from_user(user)
+            svc = PipelineService(session, ai_service=ai)
+            await svc.run_daily_for_all(user_id)
 
     background_tasks.add_task(_run)
     return {"message": "Daily pipeline started"}

@@ -1,22 +1,52 @@
-"""DeepSeek AI service for paper analysis, summarization, and evaluation."""
+"""AI service — per-user configurable provider (DeepSeek, OpenAI-compatible)."""
+
+from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 import httpx
 
 from ..config import settings
 
+if TYPE_CHECKING:
+    from ..models.models import User
+
 
 class AIService:
-    """Calls DeepSeek API for paper scoring, summarization, and report generation."""
+    """Calls an OpenAI-compatible chat API for paper scoring, summarization, and reports.
 
-    def __init__(self) -> None:
-        self.base_url = settings.deepseek_base_url
-        self.api_key = settings.deepseek_api_key
-        self.model = settings.deepseek_model
+    Each instance is bound to a specific user's configuration.
+    Falls back to server-level defaults when the user hasn't set their own.
+    """
+
+    def __init__(
+        self,
+        *,
+        api_key: str = "",
+        base_url: str = "",
+        model: str = "",
+    ) -> None:
+        self.api_key = api_key or settings.deepseek_api_key
+        self.base_url = base_url or settings.deepseek_base_url
+        self.model = model or settings.deepseek_model
+
+    @classmethod
+    def from_user(cls, user: User) -> AIService:
+        """Create an AIService configured for a specific user."""
+        return cls(
+            api_key=user.ai_api_key or "",
+            base_url=user.ai_base_url or "",
+            model=user.ai_model or "",
+        )
+
+    @classmethod
+    def default(cls) -> AIService:
+        """Create an AIService using server-level defaults only."""
+        return cls()
 
     async def _chat(self, system: str, user: str, temperature: float = 0.3) -> str:
-        """Send a chat completion request to DeepSeek."""
+        """Send a chat completion request."""
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -43,12 +73,13 @@ class AIService:
             user=user,
             temperature=0.1,
         )
-        # Strip markdown code fences if present
         text = text.strip()
         if text.startswith("```"):
             lines = text.split("\n")
             text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
         return json.loads(text)
+
+    # ── Public API ──────────────────────────────────────────────────────────
 
     async def score_paper(self, title: str, abstract: str, venue: str | None = None) -> dict:
         """Score a paper's relevance and importance on 0-10 scale."""

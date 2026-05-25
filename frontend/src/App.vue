@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { auth, logout } from './stores/auth'
+import { auth, isGuest, logout } from './stores/auth'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -8,20 +8,33 @@ const router = useRouter()
 <template>
   <div class="min-h-screen bg-zinc-950 text-zinc-200">
     <!-- Nav -->
-    <nav v-if="auth.token" class="border-b border-zinc-800 px-6 py-3 flex items-center justify-between">
+    <nav
+      :class="auth.token ? 'border-b border-zinc-800' : ''"
+      class="px-6 py-3 flex items-center justify-between">
       <div class="flex items-center gap-6">
         <router-link to="/" class="text-lg font-bold text-white tracking-tight">
           🔬 Academic Hunter
         </router-link>
-        <router-link to="/" class="text-sm text-zinc-400 hover:text-white transition">控制台</router-link>
-        <router-link to="/subscriptions" class="text-sm text-zinc-400 hover:text-white transition">订阅</router-link>
-        <router-link to="/search" class="text-sm text-zinc-400 hover:text-white transition">搜索</router-link>
+        <template v-if="auth.token">
+          <router-link to="/dashboard" class="text-sm text-zinc-400 hover:text-white transition">控制台</router-link>
+          <router-link to="/subscriptions" class="text-sm text-zinc-400 hover:text-white transition">订阅</router-link>
+          <router-link to="/search" class="text-sm text-zinc-400 hover:text-white transition">搜索</router-link>
+          <router-link to="/settings" class="text-sm text-zinc-400 hover:text-white transition">设置</router-link>
+        </template>
+        <template v-else-if="isGuest">
+          <router-link to="/settings" class="text-sm text-zinc-400 hover:text-white transition">设置</router-link>
+        </template>
       </div>
       <div class="flex items-center gap-4">
-        <span v-if="auth.user" class="text-sm text-zinc-500">{{ auth.user.email }}</span>
-        <button @click="logout(); router.push('/login')" class="text-sm text-zinc-500 hover:text-red-400 transition">
-          退出
-        </button>
+        <template v-if="auth.token">
+          <span v-if="auth.user" class="text-sm text-zinc-500">{{ auth.user.email }}</span>
+          <button @click="logout(); router.push('/')" class="text-sm text-zinc-500 hover:text-red-400 transition">
+            退出
+          </button>
+        </template>
+        <template v-else>
+          <router-link to="/login" class="text-sm text-zinc-400 hover:text-white transition">登录</router-link>
+        </template>
       </div>
     </nav>
 

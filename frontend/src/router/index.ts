@@ -1,70 +1,70 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { auth, fetchUser } from '../stores/auth'
+import { auth, fetchUser, getGuestConfig } from '../stores/auth'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    // ── Public routes (no auth required) ──
+    {
+      path: '/',
+      name: 'Home',
+      component: () => import('../views/HomeView.vue'),
+    },
     {
       path: '/login',
       name: 'Login',
       component: () => import('../views/LoginView.vue'),
-      meta: { guest: true },
     },
     {
       path: '/register',
       name: 'Register',
       component: () => import('../views/RegisterView.vue'),
-      meta: { guest: true },
     },
+    // ── App routes (available to all, persistent features require login) ──
     {
       path: '/onboarding',
       name: 'Onboarding',
       component: () => import('../views/OnboardingView.vue'),
-      meta: { auth: true },
     },
     {
-      path: '/',
+      path: '/dashboard',
       name: 'Dashboard',
       component: () => import('../views/DashboardView.vue'),
-      meta: { auth: true },
     },
     {
       path: '/subscriptions',
       name: 'Subscriptions',
       component: () => import('../views/SubscriptionsView.vue'),
-      meta: { auth: true },
     },
     {
       path: '/briefs/:id',
       name: 'BriefDetail',
       component: () => import('../views/BriefDetailView.vue'),
-      meta: { auth: true },
     },
     {
       path: '/papers/:id',
       name: 'PaperDetail',
       component: () => import('../views/PaperDetailView.vue'),
-      meta: { auth: true },
     },
     {
       path: '/search',
       name: 'Search',
       component: () => import('../views/SearchView.vue'),
-      meta: { auth: true },
+    },
+    {
+      path: '/settings',
+      name: 'Settings',
+      component: () => import('../views/SettingsView.vue'),
     },
   ],
 })
 
 router.beforeEach(async (to) => {
+  // Auto-fetch user if we have a stored token
   if (!auth.user && auth.token) {
     await fetchUser()
   }
-  if (to.meta.auth && !auth.token) {
-    return '/login'
-  }
-  if (to.meta.guest && auth.token) {
-    return '/'
-  }
+  // No forced redirects — guest mode is always allowed
 })
 
 export default router
