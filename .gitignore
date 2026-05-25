@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+
+# Env
+.env
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# Docker
+pgdata/
