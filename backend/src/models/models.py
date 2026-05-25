@@ -36,6 +36,9 @@ class User(Base):
     ai_base_url: Mapped[str | None] = mapped_column(String(512), default=None)
     ai_model: Mapped[str | None] = mapped_column(String(100), default=None)
 
+    # Semantic Scholar API key (optional, increases rate limits)
+    s2_api_key: Mapped[str | None] = mapped_column(String(255), default=None)
+
     topic_subscriptions: Mapped[list[TopicSubscription]] = relationship(back_populates="user", cascade="all, delete-orphan")
     researcher_subscriptions: Mapped[list[ResearcherSubscription]] = relationship(back_populates="user", cascade="all, delete-orphan")
 

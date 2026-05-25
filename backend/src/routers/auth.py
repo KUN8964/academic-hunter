@@ -70,6 +70,8 @@ async def update_settings(
         current_user.ai_base_url = payload.ai_base_url if payload.ai_base_url else None
     if payload.ai_model is not None:
         current_user.ai_model = payload.ai_model if payload.ai_model else None
+    if payload.s2_api_key is not None:
+        current_user.s2_api_key = payload.s2_api_key if payload.s2_api_key else None
 
     await db.commit()
     await db.refresh(current_user)

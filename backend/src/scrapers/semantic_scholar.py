@@ -12,14 +12,22 @@ def utcnow() -> datetime:
 
 
 class SemanticScholarScraper:
-    """Fetch papers and author data from Semantic Scholar API."""
+    """Fetch papers and author data from Semantic Scholar API.
+
+    Accepts an optional per-user API key. Falls back to server-level key.
+    """
 
     BASE_URL = "https://api.semanticscholar.org/graph/v1"
 
+    def __init__(self, api_key: str = "") -> None:
+        self._user_key = api_key
+
     def _headers(self) -> dict:
         h = {}
-        if settings.s2_api_key:
-            h["x-api-key"] = settings.s2_api_key
+        # User key takes priority, then server key
+        key = self._user_key or settings.s2_api_key
+        if key:
+            h["x-api-key"] = key
         return h
 
     async def search(

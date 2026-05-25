@@ -37,24 +37,29 @@ class UserSettingsUpdate(BaseModel):
     ai_api_key: str | None = None
     ai_base_url: str | None = None
     ai_model: str | None = None
+    s2_api_key: str | None = None
 
 
 class UserSettingsResponse(BaseModel):
-    """User's AI settings. API key is masked for security (only last 4 chars shown)."""
+    """User's AI settings. API keys are masked for security (only last 4 chars shown)."""
 
     ai_api_key_masked: str | None = None
     ai_base_url: str | None = None
     ai_model: str | None = None
+    s2_api_key_masked: str | None = None
 
     @classmethod
     def from_user(cls, user) -> "UserSettingsResponse":
-        masked = None
-        if user.ai_api_key:
-            masked = "sk-..." + user.ai_api_key[-4:] if len(user.ai_api_key) > 4 else "****"
+        def _mask(key: str | None) -> str | None:
+            if not key:
+                return None
+            return "..." + key[-4:] if len(key) > 4 else "****"
+
         return cls(
-            ai_api_key_masked=masked,
+            ai_api_key_masked=_mask(user.ai_api_key),
             ai_base_url=user.ai_base_url,
             ai_model=user.ai_model,
+            s2_api_key_masked=_mask(user.s2_api_key),
         )
 
     model_config = {"from_attributes": True}

@@ -35,7 +35,7 @@ async def trigger_daily_run(
                     logger.warning("Pipeline: user %s not found in background session", user_id)
                     return
                 ai = AIService.from_user(user)
-                svc = PipelineService(session, ai_service=ai)
+                svc = PipelineService(session, ai_service=ai, s2_api_key=user.s2_api_key or "")
                 logger.info("Pipeline: starting run_daily_for_all for user %s", user_id)
                 briefs = await svc.run_daily_for_all(user_id)
                 logger.info("Pipeline: completed — %d briefs generated", len(briefs))
@@ -58,7 +58,7 @@ async def debug_run(current_user: User = Depends(get_current_user)):
             return {"error": "user not found"}
 
         ai = AIService.from_user(user)
-        svc = PipelineService(session, ai_service=ai)
+        svc = PipelineService(session, ai_service=ai, s2_api_key=user.s2_api_key or "")
 
         # Check subscriptions
         from ..models.models import TopicSubscription as TS

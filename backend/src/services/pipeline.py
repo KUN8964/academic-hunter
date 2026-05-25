@@ -55,11 +55,12 @@ class PipelineService:
         ai_service: AIServiceProtocol | None = None,
         arxiv_scraper: ScraperProtocol | None = None,
         s2_scraper: ScraperProtocol | None = None,
+        s2_api_key: str = "",
     ) -> None:
         self.db = db
         self.ai = ai_service or AIService()
         self.arxiv = arxiv_scraper or ArxivScraper()
-        self.s2 = s2_scraper or SemanticScholarScraper()
+        self.s2 = s2_scraper or SemanticScholarScraper(api_key=s2_api_key)
 
     # ──────────────────────────────── Public API ────────────────────────────────
 
