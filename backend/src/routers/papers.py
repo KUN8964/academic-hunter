@@ -47,6 +47,11 @@ async def get_paper(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a single paper by ID."""
+    import uuid as _uuid
+    try:
+        _uuid.UUID(paper_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Paper not found")
     result = await db.execute(select(Paper).where(Paper.id == paper_id))
     paper = result.scalar_one_or_none()
     if not paper:
