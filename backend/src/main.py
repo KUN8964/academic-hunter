@@ -2,20 +2,17 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 from sqlalchemy import text
 
 from .config import settings
 from .database import engine
+from .limiter import limiter
 from .models.models import Base
 from .routers import auth, papers, pipeline, public, subscriptions
-
-# Rate limiter: in-memory, keyed by client IP
-limiter = Limiter(key_func=get_remote_address, default_limits=["200/hour"])
 
 
 @asynccontextmanager
@@ -38,7 +35,7 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS — allow frontend dev server (configurable via CORS_ORIGINS env)
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
@@ -48,7 +45,7 @@ app.add_middleware(
 )
 
 # Routers
-app.include_router(public.router)        # No auth required
+app.include_router(public.router)
 app.include_router(auth.router)
 app.include_router(subscriptions.router)
 app.include_router(papers.router)

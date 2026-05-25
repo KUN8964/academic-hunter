@@ -1,11 +1,10 @@
 """Authentication router: register, login, profile."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
+from ..limiter import limiter
 from ..models.models import User
 from ..schemas import (
     TokenResponse,
@@ -21,22 +20,10 @@ from ..services.auth_middleware import get_current_user
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def get_limiter(request: Request) -> Limiter:
-    """Get the rate limiter from app state (registered in main.py)."""
-    return request.app.state.limiter
-
-
 @router.post("/register", response_model=TokenResponse, status_code=201)
-async def register(
-    request: Request,
-    payload: UserRegister,
-    db: AsyncSession = Depends(get_db),
-    limiter: Limiter = Depends(get_limiter),
-):
+@limiter.limit("5/minute")
+async def register(request: Request, payload: UserRegister, db: AsyncSession = Depends(get_db)):
     """Register a new user and return a JWT token. Rate limit: 5/min per IP."""
-    # Apply rate limit
-    await limiter._check_request_limit("5/minute", get_remote_address, request)
-
     existing = await get_user_by_email(db, payload.email)
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
@@ -47,16 +34,9 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(
-    request: Request,
-    payload: UserLogin,
-    db: AsyncSession = Depends(get_db),
-    limiter: Limiter = Depends(get_limiter),
-):
+@limiter.limit("10/minute")
+async def login(request: Request, payload: UserLogin, db: AsyncSession = Depends(get_db)):
     """Login with email and password, return JWT token. Rate limit: 10/min per IP."""
-    # Apply rate limit
-    await limiter._check_request_limit("10/minute", get_remote_address, request)
-
     user = await get_user_by_email(db, payload.email)
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
