@@ -206,3 +206,27 @@ class OnboardingConfirmRequest(BaseModel):
     query_text: str
     ai_keywords: list[str]
     researcher_names: list[str] = []
+
+
+# ── Public Search ──
+
+class PublicSearchRequest(BaseModel):
+    keywords: list[str]  # AI-expanded keywords to search with
+    ai_api_key: str = ""
+    ai_base_url: str = ""
+    ai_model: str = ""
+
+
+class PublicPaperItem(BaseModel):
+    title: str
+    authors: list[str]
+    abstract: str | None
+    url: str
+    venue: str | None
+    source_type: str
+    published_at: str | None
+
+
+class PublicSearchResponse(BaseModel):
+    papers: list[PublicPaperItem]
+    total: int
