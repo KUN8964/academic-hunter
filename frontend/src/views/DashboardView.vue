@@ -104,6 +104,18 @@ async function runPipeline() {
 function goOnboarding() {
   router.push('/onboarding')
 }
+
+async function deleteTopic(id: string) {
+  if (!confirm('确定删除这个订阅？')) return
+  await api.delete(`/subscriptions/topics/${id}`)
+  topicSubs.value = topicSubs.value.filter(s => s.id !== id)
+}
+
+async function deleteResearcher(id: string) {
+  if (!confirm('确定删除这个追踪？')) return
+  await api.delete(`/subscriptions/researchers/${id}`)
+  researcherSubs.value = researcherSubs.value.filter(s => s.id !== id)
+}
 </script>
 
 <template>
@@ -163,11 +175,14 @@ function goOnboarding() {
         <h2 class="text-lg font-semibold text-zinc-300 mb-4">领域订阅 ({{ topicSubs.length }})</h2>
         <div class="grid gap-2">
           <div v-for="sub in topicSubs" :key="sub.id"
-            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between">
+            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between group">
             <span class="text-white text-sm">{{ sub.query_text }}</span>
-            <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
-              {{ sub.status === 'active' ? '活跃' : '暂停' }}
-            </span>
+            <div class="flex items-center gap-2">
+              <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
+                {{ sub.status === 'active' ? '活跃' : '暂停' }}
+              </span>
+              <button @click="deleteTopic(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
+            </div>
           </div>
         </div>
       </section>
@@ -176,11 +191,14 @@ function goOnboarding() {
         <h2 class="text-lg font-semibold text-zinc-300 mb-4">研究者追踪 ({{ researcherSubs.length }})</h2>
         <div class="grid gap-2">
           <div v-for="sub in researcherSubs" :key="sub.id"
-            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between">
+            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between group">
             <span class="text-white text-sm">{{ sub.researcher_name }}</span>
-            <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
-              {{ sub.status === 'active' ? '活跃' : '暂停' }}
-            </span>
+            <div class="flex items-center gap-2">
+              <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
+                {{ sub.status === 'active' ? '活跃' : '暂停' }}
+              </span>
+              <button @click="deleteResearcher(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
+            </div>
           </div>
         </div>
       </section>
