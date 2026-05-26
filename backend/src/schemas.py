@@ -1,7 +1,7 @@
 """Pydantic schemas for API request/response validation."""
 
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 # ── Auth ──
@@ -163,6 +163,13 @@ class DailyBriefResponse(BaseModel):
     papers: list
     generated_at: datetime
 
+    @field_validator("date", mode="before")
+    @classmethod
+    def serialize_date(cls, v: object) -> str:
+        if isinstance(v, str):
+            return v
+        return str(v)
+
     model_config = {"from_attributes": True}
 
 
@@ -176,6 +183,13 @@ class ResearchReportResponse(BaseModel):
     week_start: str
     content: str
     generated_at: datetime
+
+    @field_validator("week_start", mode="before")
+    @classmethod
+    def serialize_week_start(cls, v: object) -> str:
+        if isinstance(v, str):
+            return v
+        return str(v)
 
     model_config = {"from_attributes": True}
 
