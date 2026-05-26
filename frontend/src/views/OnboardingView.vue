@@ -58,9 +58,14 @@ async function confirmAndCreate() {
     }
     for (const name of names) {
       const field = fieldMap[name.toLowerCase()]
+      const tags = field ? [field] : []
+      // Also tag with domain name for cascade lookup
+      if (!tags.includes(queryText.value.trim())) {
+        tags.push(queryText.value.trim())
+      }
       await api.post('/subscriptions/researchers', {
         researcher_name: name,
-        ai_keywords: field ? [field] : [],
+        ai_keywords: tags,
       })
     }
 

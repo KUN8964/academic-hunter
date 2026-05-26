@@ -102,9 +102,34 @@ async function toggleTopic(sub: Sub) {
 }
 
 async function deleteTopic(id: string) {
-  if (!confirm('确定删除这个订阅？')) return
+  const topic = topicSubs.value.find((s: Sub) => s.id === id)
+  if (!topic || !topic.query_text) return
+  if (!confirm('确定删除领域「' + topic.query_text + '」？')) return
+
+  const domainTag = topic.query_text
+  const linkedResearchers = researcherSubs.value.filter(
+    (r: Sub) => r.ai_keywords.includes(domainTag)
+  )
+
   await api.delete(`/subscriptions/topics/${id}`)
-  topicSubs.value = topicSubs.value.filter((s) => s.id !== id)
+  topicSubs.value = topicSubs.value.filter((s: Sub) => s.id !== id)
+
+  if (linkedResearchers.length > 0) {
+    const shouldDelete = confirm(
+      '该领域下有 ' + linkedResearchers.length + ' 位研究者（' +
+      linkedResearchers.map((r: Sub) => r.researcher_name).slice(0, 3).join('、') +
+      (linkedResearchers.length > 3 ? '等' : '') +
+      '）。\n\n是否同时删除这些研究者？\n\n确定=一并删除 | 取消=保留研究者'
+    )
+    if (shouldDelete) {
+      for (const r of linkedResearchers) {
+        await api.delete(`/subscriptions/researchers/${r.id}`)
+      }
+      researcherSubs.value = researcherSubs.value.filter(
+        (r: Sub) => !linkedResearchers.includes(r)
+      )
+    }
+  }
 }
 
 async function toggleResearcher(sub: Sub) {

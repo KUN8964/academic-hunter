@@ -112,9 +112,32 @@ function goOnboarding() {
 }
 
 async function deleteTopic(id: string) {
-  if (!confirm('确定删除这个订阅？')) return
+  const topic = topicSubs.value.find(s => s.id === id)
+  if (!topic || !topic.query_text) return
+  if (!confirm('确定删除领域「' + topic.query_text + '」？')) return
+
+  // Find researchers tagged with this domain
+  const domainTag = topic.query_text
+  const linkedResearchers = researcherSubs.value.filter(
+    r => r.ai_keywords.includes(domainTag)
+  )
+
   await api.delete(`/subscriptions/topics/${id}`)
   topicSubs.value = topicSubs.value.filter(s => s.id !== id)
+
+  if (linkedResearchers.length > 0) {
+    const shouldDelete = confirm(
+      `该领域下有 ${linkedResearchers.length} 位研究者（${linkedResearchers.map(r => r.researcher_name).slice(0, 3).join('、')}${linkedResearchers.length > 3 ? '等' : ''}）。\n\n是否同时删除这些研究者？\n\n确定=一并删除 | 取消=保留研究者`
+    )
+    if (shouldDelete) {
+      for (const r of linkedResearchers) {
+        await api.delete(`/subscriptions/researchers/${r.id}`)
+      }
+      researcherSubs.value = researcherSubs.value.filter(
+        r => !linkedResearchers.includes(r)
+      )
+    }
+  }
 }
 
 async function deleteResearcher(id: string) {
@@ -233,6 +256,11 @@ function doneEditing() {
                 </span>
                 <button @click="deleteTopic(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
               </div>
+            </div>
+            <div v-if="sub.ai_keywords?.length" class="flex flex-wrap gap-1 mt-1.5">
+              <span v-for="kw in sub.ai_keywords" :key="kw" class="px-1.5 py-0.5 bg-blue-900/30 text-blue-300 text-xs rounded">
+                {{ kw }}
+              </span>
             </div>
             <div class="text-xs text-zinc-600 mt-1">
               创建于 {{ new Date(sub.created_at).toLocaleDateString('zh-CN') }}
