@@ -157,6 +157,7 @@ Use Chinese throughout."""
         """AI expands a user's natural language query into keywords, sub-fields, and suggested researchers."""
         system = """You are a research librarian. Given a natural language description of a research interest, 
 expand it into search keywords, related sub-fields, and suggested key researchers in the area.
-Return JSON: {"keywords": ["kw1", "kw2", ...], "subfields": ["sub1", "sub2", ...], "researchers": [{"name": "...", "orcid": "..." or null, "s2_author_id": "..." or null}]}"""
+For each researcher, include a short 'field' describing their primary research area or specialty.
+Return JSON: {"keywords": ["kw1", "kw2", ...], "subfields": ["sub1", "sub2", ...], "researchers": [{"name": "...", "field": "e.g. dermatology, NLP, systems", "orcid": "..." or null, "s2_author_id": "..." or null}]}"""
         user = query_text
         return await self._chat_json(system, user)

@@ -46,14 +46,21 @@ async function confirmAndCreate() {
       ai_keywords: aiKeywords.value,
     })
 
-    // Create researcher subscriptions
+    // Create researcher subscriptions with auto-tags from AI suggestions
     const names = researcherNames.value
       .split(/[,，、]+/)
       .map((n) => n.trim())
       .filter(Boolean)
+    // Build lookup: researcher name → field from AI suggestion
+    const fieldMap: Record<string, string> = {}
+    for (const r of suggestedResearchers.value) {
+      if (r.field) fieldMap[r.name.toLowerCase()] = r.field
+    }
     for (const name of names) {
+      const field = fieldMap[name.toLowerCase()]
       await api.post('/subscriptions/researchers', {
         researcher_name: name,
+        ai_keywords: field ? [field] : [],
       })
     }
 
