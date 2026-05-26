@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { auth, fetchUser } from '../stores/auth'
 import api from '../api'
 
 interface Sub {
@@ -25,16 +26,33 @@ const topicSubs = ref<Sub[]>([])
 const researcherSubs = ref<Sub[]>([])
 const briefs = ref<Brief[]>([])
 const loading = ref(true)
+const error = ref('')
 const running = ref(false)
 const runMsg = ref('')
-const runProgress = ref(0)
+
+// Tag editing state
+const editingTag = ref<string | null>(null)  // sub id being edited
+const newTag = ref('')
 
 onMounted(async () => {
+  if (!auth.user && auth.token) {
+    try {
+      await fetchUser()
+    } catch {
+      router.push('/login')
+      return
+    }
+  }
+  if (!auth.token) {
+    router.push('/login')
+    return
+  }
   await loadAll()
 })
 
 async function loadAll() {
   loading.value = true
+  error.value = ''
   try {
     const [t, r, b] = await Promise.all([
       api.get('/subscriptions/topics'),
@@ -44,6 +62,12 @@ async function loadAll() {
     topicSubs.value = t.data
     researcherSubs.value = r.data
     briefs.value = b.data
+  } catch (e: any) {
+    if (e.response?.status === 401) {
+      router.push('/login')
+      return
+    }
+    error.value = '加载失败，请刷新重试'
   } finally {
     loading.value = false
   }
@@ -51,35 +75,24 @@ async function loadAll() {
 
 async function triggerPipeline() {
   running.value = true
-  runMsg.value = '正在搜索 arXiv + Semantic Scholar...'
-  runProgress.value = 10
+  runMsg.value = 'Pipeline 已启动，正在后台搜索论文...'
   try {
     await api.post('/pipeline/run')
-    runMsg.value = '正在评分和生成简报...'
-    runProgress.value = 50
-    const prevCount = briefs.value.length
-    for (let i = 0; i < 10; i++) {
-      await new Promise(r => setTimeout(r, 3000))
-      runProgress.value = 50 + i * 5
-      const { data } = await api.get('/pipeline/briefs')
-      if (data.length > prevCount) {
+    runMsg.value = '运行完成，加载结果...'
+    setTimeout(async () => {
+      try {
+        const { data } = await api.get('/pipeline/briefs')
         briefs.value = data
-        runMsg.value = `完成！新增 ${data.length - prevCount} 份简报`
-        runProgress.value = 100
-        break
+        runMsg.value = `完成！共 ${data.length} 份简报`
+      } catch {
+        runMsg.value = '简报加载失败'
       }
-      runMsg.value = `等待中... (${(i + 1) * 3}s)`
-    }
-    if (briefs.value.length === prevCount) {
-      const { data } = await api.get('/pipeline/briefs')
-      briefs.value = data
-      runMsg.value = briefs.value.length > prevCount ? '完成！' : '未找到新论文，请确认订阅有关键词'
-    }
+      running.value = false
+    }, 5000)
   } catch (e: any) {
     runMsg.value = '启动失败: ' + (e.response?.data?.detail || '未知错误')
+    running.value = false
   }
-  running.value = false
-  setTimeout(() => { runMsg.value = ''; runProgress.value = 0 }, 5000)
 }
 
 async function toggleTopic(sub: Sub) {
@@ -112,6 +125,33 @@ async function deleteBrief(id: string) {
   briefs.value = briefs.value.filter(b => b.id !== id)
 }
 
+// ── Tag management ──
+
+function startEditTag(subId: string) {
+  editingTag.value = subId
+  newTag.value = ''
+}
+
+async function addTag(sub: Sub) {
+  const tag = newTag.value.trim()
+  if (!tag) return
+  const updated = [...sub.ai_keywords, tag]
+  await api.patch(`/subscriptions/researchers/${sub.id}`, { ai_keywords: updated })
+  sub.ai_keywords = updated
+  newTag.value = ''
+}
+
+async function removeTag(sub: Sub, tag: string) {
+  const updated = sub.ai_keywords.filter(t => t !== tag)
+  await api.patch(`/subscriptions/researchers/${sub.id}`, { ai_keywords: updated })
+  sub.ai_keywords = updated
+}
+
+function doneEditing() {
+  editingTag.value = null
+  newTag.value = ''
+}
+
 function getSubName(brief: Brief): string {
   const topic = topicSubs.value.find(s => s.id === brief.subscription_id)
   if (topic) return topic.query_text || '(未命名)'
@@ -133,94 +173,125 @@ function getLatestBriefDate(subId: string): string | null {
       <h1 class="text-2xl font-bold text-white">订阅管理</h1>
       <button @click="triggerPipeline" :disabled="running"
         class="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm rounded-lg transition">
-        {{ running ? '启动中...' : '⚡ 立即运行 Pipeline' }}
+        {{ running ? '启动中...' : '立即运行 Pipeline' }}
       </button>
     </div>
 
-    <p v-if="runMsg" class="text-sm text-green-400 mb-4">
-      {{ runMsg }}
-      <span v-if="runProgress > 0 && runProgress < 100" class="text-zinc-500 ml-2">{{ runProgress }}%</span>
-    </p>
+    <p v-if="runMsg" class="text-sm mb-4" :class="runMsg.includes('失败') ? 'text-red-400' : 'text-green-400'">{{ runMsg }}</p>
 
-    <!-- Topic -->
-    <section class="mb-10">
-      <h2 class="text-lg font-semibold text-zinc-300 mb-4">📚 领域订阅 <span class="text-zinc-600 text-sm">({{ topicSubs.length }})</span></h2>
-      <div v-if="topicSubs.length === 0 && !loading" class="text-zinc-500 text-sm">暂无领域订阅，前往 <router-link to="/onboarding" class="text-blue-400">引导页</router-link> 创建</div>
-      <div v-for="sub in topicSubs" :key="sub.id"
-        class="p-4 bg-zinc-900 border border-zinc-800 rounded-lg mb-3">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-white font-medium">{{ sub.query_text }}</span>
-          <div class="flex items-center gap-2">
-            <button @click="toggleTopic(sub)"
-              :class="sub.status === 'active' ? 'text-green-400 hover:text-green-300' : 'text-zinc-500 hover:text-zinc-400'"
-              class="text-xs transition">
-              {{ sub.status === 'active' ? '活跃' : '已暂停' }}
+    <div v-if="error"
+      class="p-4 bg-red-950/30 border border-red-900/30 rounded-lg text-red-400 text-sm mb-6 flex items-center gap-3">
+      <span>{{ error }}</span>
+      <button @click="loadAll" class="text-red-300 hover:text-red-200 underline text-xs">重试</button>
+    </div>
+
+    <div v-if="loading" class="text-center py-12">
+      <div class="inline-block w-6 h-6 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-3"></div>
+      <p class="text-zinc-500 text-sm">加载中...</p>
+    </div>
+
+    <template v-if="!loading && !error">
+      <!-- Topic -->
+      <section class="mb-10">
+        <h2 class="text-lg font-semibold text-zinc-300 mb-4">
+          领域订阅 <span class="text-zinc-600 text-sm">({{ topicSubs.length }})</span>
+        </h2>
+        <div v-if="topicSubs.length === 0" class="text-zinc-500 text-sm">
+          暂无领域订阅，前往 <router-link to="/onboarding" class="text-blue-400 hover:underline">引导页</router-link> 创建
+        </div>
+        <div v-for="sub in topicSubs" :key="sub.id"
+          class="p-4 bg-zinc-900 border border-zinc-800 rounded-lg mb-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-white font-medium">{{ sub.query_text }}</span>
+            <div class="flex items-center gap-2">
+              <button @click="toggleTopic(sub)"
+                :class="sub.status === 'active' ? 'text-green-400 hover:text-green-300' : 'text-zinc-500 hover:text-zinc-400'"
+                class="text-xs transition">
+                {{ sub.status === 'active' ? '活跃' : '已暂停' }}
+              </button>
+              <button @click="deleteTopic(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 transition">删除</button>
+            </div>
+          </div>
+          <div v-if="sub.ai_keywords?.length" class="flex flex-wrap gap-1 mb-2">
+            <span v-for="kw in sub.ai_keywords" :key="kw" class="px-1.5 py-0.5 bg-zinc-800 text-zinc-400 text-xs rounded">
+              {{ kw }}
+            </span>
+          </div>
+          <div class="text-xs text-zinc-600 mt-2">
+            创建于 {{ new Date(sub.created_at).toLocaleDateString('zh-CN') }}
+          </div>
+        </div>
+      </section>
+
+      <!-- Researcher -->
+      <section class="mb-10">
+        <h2 class="text-lg font-semibold text-zinc-300 mb-4">
+          研究者追踪 <span class="text-zinc-600 text-sm">({{ researcherSubs.length }})</span>
+        </h2>
+        <div v-if="researcherSubs.length === 0 && !loading" class="text-zinc-500 text-sm">暂无研究者追踪</div>
+        <div v-for="sub in researcherSubs" :key="sub.id"
+          class="p-4 bg-zinc-900 border border-zinc-800 rounded-lg mb-3">
+          <div class="flex items-center justify-between">
+            <span class="text-white font-medium">{{ sub.researcher_name }}</span>
+            <div class="flex items-center gap-2">
+              <button @click="toggleResearcher(sub)"
+                :class="sub.status === 'active' ? 'text-green-400 hover:text-green-300' : 'text-zinc-500 hover:text-zinc-400'"
+                class="text-xs transition">
+                {{ sub.status === 'active' ? '活跃' : '已暂停' }}
+              </button>
+              <button @click="deleteResearcher(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 transition">删除</button>
+            </div>
+          </div>
+
+          <!-- Tags row -->
+          <div class="flex flex-wrap items-center gap-1 mt-2">
+            <span v-for="tag in sub.ai_keywords" :key="tag"
+              class="px-1.5 py-0.5 bg-blue-900/40 text-blue-300 text-xs rounded cursor-pointer hover:bg-red-900/40 hover:text-red-300 transition"
+              @click="removeTag(sub, tag)" title="点击删除标签">
+              {{ tag }} ×
+            </span>
+            <!-- Add tag -->
+            <template v-if="editingTag === sub.id">
+              <input v-model="newTag" @keyup.enter="addTag(sub)" @keyup.escape="doneEditing()" @blur="doneEditing()"
+                ref="tagInput" placeholder="领域标签..."
+                class="w-20 px-1.5 py-0.5 bg-zinc-800 border border-zinc-600 rounded text-xs text-white focus:outline-none focus:border-blue-500" />
+            </template>
+            <button v-else @click="startEditTag(sub.id)"
+              class="px-1.5 py-0.5 border border-dashed border-zinc-700 text-zinc-600 text-xs rounded hover:border-zinc-500 hover:text-zinc-400 transition">
+              + 标签
             </button>
-            <button @click="deleteTopic(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 transition">删除</button>
           </div>
-        </div>
-        <!-- AI keywords -->
-        <div v-if="sub.ai_keywords?.length" class="flex flex-wrap gap-1 mb-2">
-          <span v-for="kw in sub.ai_keywords" :key="kw" class="px-1.5 py-0.5 bg-zinc-800 text-zinc-400 text-xs rounded">
-            {{ kw }}
-          </span>
-        </div>
-        <!-- Link to latest briefs -->
-        <div class="text-xs text-zinc-600 mt-2">
-          创建于 {{ new Date(sub.created_at).toLocaleDateString('zh-CN') }}
-        </div>
-      </div>
-    </section>
 
-    <!-- Researcher -->
-    <section class="mb-10">
-      <h2 class="text-lg font-semibold text-zinc-300 mb-4">👤 研究者追踪 <span class="text-zinc-600 text-sm">({{ researcherSubs.length }})</span></h2>
-      <div v-if="researcherSubs.length === 0 && !loading" class="text-zinc-500 text-sm">暂无研究者追踪</div>
-      <div v-for="sub in researcherSubs" :key="sub.id"
-        class="p-4 bg-zinc-900 border border-zinc-800 rounded-lg mb-3">
-        <div class="flex items-center justify-between">
-          <span class="text-white font-medium">{{ sub.researcher_name }}</span>
-          <div class="flex items-center gap-2">
-            <button @click="toggleResearcher(sub)"
-              :class="sub.status === 'active' ? 'text-green-400 hover:text-green-300' : 'text-zinc-500 hover:text-zinc-400'"
-              class="text-xs transition">
-              {{ sub.status === 'active' ? '活跃' : '已暂停' }}
-            </button>
-            <button @click="deleteResearcher(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 transition">删除</button>
+          <div class="text-xs text-zinc-600 mt-2 flex gap-4">
+            <span>创建于 {{ new Date(sub.created_at).toLocaleDateString('zh-CN') }}</span>
+            <span v-if="getLatestBriefDate(sub.id)">最新论文 {{ getLatestBriefDate(sub.id) }}</span>
           </div>
         </div>
-        <div v-if="sub.ai_keywords?.length" class="flex flex-wrap gap-1 mt-2">
-          <span v-for="kw in sub.ai_keywords" :key="kw" class="px-1.5 py-0.5 bg-zinc-800 text-zinc-400 text-xs rounded">
-            {{ kw }}
-          </span>
-        </div>
-        <div class="text-xs text-zinc-600 mt-2 flex gap-4">
-          <span>创建于 {{ new Date(sub.created_at).toLocaleDateString('zh-CN') }}</span>
-          <span v-if="getLatestBriefDate(sub.id)">最新论文 {{ getLatestBriefDate(sub.id) }}</span>
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Daily Briefs -->
-    <section>
-      <h2 class="text-lg font-semibold text-zinc-300 mb-4">📰 每日简报 <span class="text-zinc-600 text-sm">({{ briefs.length }})</span></h2>
-      <div v-if="briefs.length === 0 && !loading" class="text-zinc-500 text-sm">
-        暂无简报。点击上方「立即运行 Pipeline」生成第一份简报。
-      </div>
-      <div v-for="brief in briefs" :key="brief.id"
-        class="p-4 bg-zinc-900 border border-zinc-800 rounded-lg mb-3 hover:border-zinc-700 transition cursor-pointer group"
-        @click="router.push(`/briefs/${brief.id}`)">
-        <div class="flex items-center justify-between">
-          <div>
-            <span class="text-white text-sm">{{ brief.date }}</span>
-            <span class="text-zinc-500 text-xs ml-2">{{ getSubName(brief) }}</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-zinc-500">{{ brief.papers?.length || 0 }} 篇论文</span>
-            <button @click.stop="deleteBrief(brief.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
+      <!-- Daily Briefs -->
+      <section>
+        <h2 class="text-lg font-semibold text-zinc-300 mb-4">
+          每日简报 <span class="text-zinc-600 text-sm">({{ briefs.length }})</span>
+        </h2>
+        <div v-if="briefs.length === 0 && !loading" class="text-zinc-500 text-sm">
+          暂无简报。点击上方「立即运行 Pipeline」生成第一份简报。
+        </div>
+        <div v-for="brief in briefs" :key="brief.id"
+          class="p-4 bg-zinc-900 border border-zinc-800 rounded-lg mb-3 hover:border-zinc-700 transition cursor-pointer group"
+          @click="router.push(`/briefs/${brief.id}`)">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-white text-sm">{{ brief.date }}</span>
+              <span class="text-zinc-500 text-xs ml-2">{{ getSubName(brief) }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-zinc-500">{{ brief.papers?.length || 0 }} 篇论文</span>
+              <button @click.stop="deleteBrief(brief.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </template>
   </div>
 </template>

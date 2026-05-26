@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { auth, fetchUser } from '../stores/auth'
 import api from '../api'
@@ -8,6 +8,7 @@ interface Sub {
   id: string
   query_text?: string
   researcher_name?: string
+  ai_keywords: string[]
   status: string
   created_at: string
 }
@@ -29,6 +30,10 @@ const error = ref('')
 const running = ref(false)
 const runStatus = ref('')
 const runProgress = ref(0)
+
+// Tag editing
+const editingTag = ref<string | null>(null)
+const newTag = ref('')
 
 onMounted(async () => {
   if (!auth.user && auth.token) {
@@ -129,6 +134,37 @@ function getLatestBriefDate(subId: string): string | null {
   if (subBriefs.length === 0) return null
   return subBriefs.sort((a, b) => b.date.localeCompare(a.date))[0].date
 }
+
+// ── Tag management ──
+
+function startEditTag(subId: string) {
+  editingTag.value = subId
+  newTag.value = ''
+  nextTick(() => {
+    const input = document.querySelector<HTMLInputElement>(`[data-tag-input="${subId}"]`)
+    input?.focus()
+  })
+}
+
+async function addTag(sub: Sub) {
+  const tag = newTag.value.trim()
+  if (!tag) return
+  const updated = [...sub.ai_keywords, tag]
+  await api.patch(`/subscriptions/researchers/${sub.id}`, { ai_keywords: updated })
+  sub.ai_keywords = updated
+  newTag.value = ''
+}
+
+async function removeTag(sub: Sub, tag: string) {
+  const updated = sub.ai_keywords.filter(t => t !== tag)
+  await api.patch(`/subscriptions/researchers/${sub.id}`, { ai_keywords: updated })
+  sub.ai_keywords = updated
+}
+
+function doneEditing() {
+  editingTag.value = null
+  newTag.value = ''
+}
 </script>
 
 <template>
@@ -136,7 +172,7 @@ function getLatestBriefDate(subId: string): string | null {
     <div class="flex items-center justify-between mb-8">
       <h1 class="text-2xl font-bold text-white">控制台</h1>
       <div class="flex items-center gap-3">
-        <button @click="runPipeline" :disabled="running"
+        <button @click="runPipeline()" :disabled="running"
           class="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm rounded-lg transition">
           {{ running ? '运行中...' : '运行 Pipeline' }}
         </button>
@@ -183,7 +219,7 @@ function getLatestBriefDate(subId: string): string | null {
         </button>
       </div>
 
-      <!-- Subscriptions -->
+      <!-- Topic subscriptions -->
       <section v-if="topicSubs.length > 0" class="mb-6">
         <h2 class="text-lg font-semibold text-zinc-300 mb-4">领域订阅 ({{ topicSubs.length }})</h2>
         <div class="grid gap-2">
@@ -206,6 +242,7 @@ function getLatestBriefDate(subId: string): string | null {
         </div>
       </section>
 
+      <!-- Researcher subscriptions -->
       <section v-if="researcherSubs.length > 0" class="mb-8">
         <h2 class="text-lg font-semibold text-zinc-300 mb-4">研究者追踪 ({{ researcherSubs.length }})</h2>
         <div class="grid gap-2">
@@ -219,6 +256,23 @@ function getLatestBriefDate(subId: string): string | null {
                 </span>
                 <button @click="deleteResearcher(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
               </div>
+            </div>
+            <!-- Tags -->
+            <div class="flex flex-wrap items-center gap-1 mt-1.5">
+              <span v-for="tag in sub.ai_keywords" :key="tag"
+                class="px-1.5 py-0.5 bg-blue-900/40 text-blue-300 text-xs rounded cursor-pointer hover:bg-red-900/40 hover:text-red-300 transition"
+                @click="removeTag(sub, tag)" title="点击删除标签">
+                {{ tag }} ×
+              </span>
+              <template v-if="editingTag === sub.id">
+                <input v-model="newTag" @keyup.enter="addTag(sub)" @keyup.escape="doneEditing()" @blur="doneEditing()"
+                  :data-tag-input="sub.id" placeholder="标签..."
+                  class="w-16 px-1 py-0.5 bg-zinc-800 border border-zinc-600 rounded text-xs text-white focus:outline-none focus:border-blue-500" />
+              </template>
+              <button v-else @click="startEditTag(sub.id)"
+                class="px-1 py-0.5 border border-dashed border-zinc-700 text-zinc-600 text-xs rounded hover:border-zinc-500 hover:text-zinc-400 transition">
+                + 标签
+              </button>
             </div>
             <div class="text-xs text-zinc-600 mt-1">
               创建于 {{ new Date(sub.created_at).toLocaleDateString('zh-CN') }}
