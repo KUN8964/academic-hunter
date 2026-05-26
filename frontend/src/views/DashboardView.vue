@@ -15,6 +15,7 @@ interface Sub {
 interface Brief {
   id: string
   subscription_type: string
+  subscription_id: string
   date: string
   papers: any[]
 }
@@ -122,6 +123,12 @@ async function deleteBrief(id: string) {
   await api.delete(`/pipeline/briefs/${id}`)
   briefs.value = briefs.value.filter(b => b.id !== id)
 }
+
+function getLatestBriefDate(subId: string): string | null {
+  const subBriefs = briefs.value.filter(b => b.subscription_id === subId)
+  if (subBriefs.length === 0) return null
+  return subBriefs.sort((a, b) => b.date.localeCompare(a.date))[0].date
+}
 </script>
 
 <template>
@@ -181,13 +188,19 @@ async function deleteBrief(id: string) {
         <h2 class="text-lg font-semibold text-zinc-300 mb-4">领域订阅 ({{ topicSubs.length }})</h2>
         <div class="grid gap-2">
           <div v-for="sub in topicSubs" :key="sub.id"
-            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between group">
-            <span class="text-white text-sm">{{ sub.query_text }}</span>
-            <div class="flex items-center gap-2">
-              <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
-                {{ sub.status === 'active' ? '活跃' : '暂停' }}
-              </span>
-              <button @click="deleteTopic(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
+            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg group">
+            <div class="flex items-center justify-between">
+              <span class="text-white text-sm">{{ sub.query_text }}</span>
+              <div class="flex items-center gap-2">
+                <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
+                  {{ sub.status === 'active' ? '活跃' : '暂停' }}
+                </span>
+                <button @click="deleteTopic(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
+              </div>
+            </div>
+            <div class="text-xs text-zinc-600 mt-1">
+              创建于 {{ new Date(sub.created_at).toLocaleDateString('zh-CN') }}
+              <span v-if="getLatestBriefDate(sub.id)" class="ml-3">最新论文 {{ getLatestBriefDate(sub.id) }}</span>
             </div>
           </div>
         </div>
@@ -197,13 +210,19 @@ async function deleteBrief(id: string) {
         <h2 class="text-lg font-semibold text-zinc-300 mb-4">研究者追踪 ({{ researcherSubs.length }})</h2>
         <div class="grid gap-2">
           <div v-for="sub in researcherSubs" :key="sub.id"
-            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between group">
-            <span class="text-white text-sm">{{ sub.researcher_name }}</span>
-            <div class="flex items-center gap-2">
-              <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
-                {{ sub.status === 'active' ? '活跃' : '暂停' }}
-              </span>
-              <button @click="deleteResearcher(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
+            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg group">
+            <div class="flex items-center justify-between">
+              <span class="text-white text-sm">{{ sub.researcher_name }}</span>
+              <div class="flex items-center gap-2">
+                <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
+                  {{ sub.status === 'active' ? '活跃' : '暂停' }}
+                </span>
+                <button @click="deleteResearcher(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
+              </div>
+            </div>
+            <div class="text-xs text-zinc-600 mt-1">
+              创建于 {{ new Date(sub.created_at).toLocaleDateString('zh-CN') }}
+              <span v-if="getLatestBriefDate(sub.id)" class="ml-3">最新论文 {{ getLatestBriefDate(sub.id) }}</span>
             </div>
           </div>
         </div>

@@ -119,6 +119,12 @@ function getSubName(brief: Brief): string {
   if (researcher) return researcher.researcher_name || '(未命名)'
   return '(已删除的订阅)'
 }
+
+function getLatestBriefDate(subId: string): string | null {
+  const subBriefs = briefs.value.filter(b => b.subscription_id === subId)
+  if (subBriefs.length === 0) return null
+  return subBriefs.sort((a, b) => b.date.localeCompare(a.date))[0].date
+}
 </script>
 
 <template>
@@ -187,6 +193,10 @@ function getSubName(brief: Brief): string {
           <span v-for="kw in sub.ai_keywords" :key="kw" class="px-1.5 py-0.5 bg-zinc-800 text-zinc-400 text-xs rounded">
             {{ kw }}
           </span>
+        </div>
+        <div class="text-xs text-zinc-600 mt-2 flex gap-4">
+          <span>创建于 {{ new Date(sub.created_at).toLocaleDateString('zh-CN') }}</span>
+          <span v-if="getLatestBriefDate(sub.id)">最新论文 {{ getLatestBriefDate(sub.id) }}</span>
         </div>
       </div>
     </section>
