@@ -6,7 +6,8 @@
 
 ## ✨ 功能
 
-- 🔍 **智能主题扩展** — 用自然语言描述研究方向，AI 自动扩展关键词、推荐相关子领域和研究者
+- 🔍 **三源聚合** — 同时检索 arXiv（预印本）、Semantic Scholar（期刊/会议）和 PubMed（生物医学）
+- 🧠 **AI 主题扩展** — 用自然语言描述研究方向，AI 自动扩展关键词、推荐相关子领域和研究者
 - 📊 **可信度评分** — 基于发表 venue、引用数的混合加权模型，自动区分高/中/低可信度论文
 - 🇨🇳 **AI 中文摘要** — 每篇论文自动生成中文摘要和标签
 - 📰 **每日简报** — 按可信度分层（高可信 / 中可信 / 待验证）的 Markdown 简报
@@ -78,6 +79,7 @@ academic-hunter/
 │   │   │   └── subscriptions.py # 订阅 CRUD
 │   │   └── scrapers/
 │   │       ├── arxiv.py         # arXiv API
+│   │       ├── pubmed.py        # PubMed / NCBI E-utilities
 │   │       └── semantic_scholar.py # Semantic Scholar API
 │   ├── tests/                   # 单元测试
 │   └── pyproject.toml

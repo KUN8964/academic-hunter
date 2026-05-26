@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { auth, fetchUser, getGuestConfig } from '../stores/auth'
+import { auth, fetchUser } from '../stores/auth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -59,7 +59,7 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach(async (to) => {
+router.beforeEach(async () => {
   // Auto-fetch user if we have a stored token
   if (!auth.user && auth.token) {
     await fetchUser()

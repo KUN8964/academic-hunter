@@ -12,6 +12,7 @@ from ..schemas import (
     PublicSearchResponse,
 )
 from ..scrapers.arxiv import ArxivScraper
+from ..scrapers.pubmed import PubMedScraper
 from ..scrapers.semantic_scholar import SemanticScholarScraper
 
 logger = logging.getLogger(__name__)
@@ -44,9 +45,10 @@ async def public_search(payload: PublicSearchRequest):
     """Search arXiv + Semantic Scholar with AI-expanded keywords. No account needed."""
     arxiv = ArxivScraper()
     s2 = SemanticScholarScraper()
+    pubmed = PubMedScraper()
     all_papers: list[dict] = []
     warnings: list[str] = []
-    arxiv_ok = s2_ok = False
+    arxiv_ok = s2_ok = pubmed_ok = False
 
     for kw in payload.keywords[:5]:
         try:
@@ -59,16 +61,23 @@ async def public_search(payload: PublicSearchRequest):
             s2_ok = True
         except Exception as e:
             logger.warning("S2 search failed for '%s': %s", kw, e)
+        try:
+            all_papers.extend(await pubmed.search(kw, max_results=8))
+            pubmed_ok = True
+        except Exception as e:
+            logger.warning("PubMed search failed for '%s': %s", kw, e)
 
-    if not arxiv_ok and not s2_ok:
+    if not arxiv_ok and not s2_ok and not pubmed_ok:
         return PublicSearchResponse(
             papers=[], total=0,
-            warning="数据源暂时不可用（arXiv 和 Semantic Scholar 均无法访问），请稍后重试"
+            warning="数据源暂时不可用（arXiv、Semantic Scholar 和 PubMed 均无法访问），请稍后重试"
         )
     if not arxiv_ok:
-        warnings.append("arXiv 暂不可用，结果仅来自 Semantic Scholar")
+        warnings.append("arXiv 暂不可用，结果仅来自 Semantic Scholar 和 PubMed")
     if not s2_ok:
-        warnings.append("Semantic Scholar 暂不可用，结果仅来自 arXiv")
+        warnings.append("Semantic Scholar 暂不可用，结果仅来自 arXiv 和 PubMed")
+    if not pubmed_ok:
+        warnings.append("PubMed 暂不可用，结果仅来自 arXiv 和 Semantic Scholar")
 
     unique = _dedup_papers(all_papers)
 

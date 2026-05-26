@@ -14,6 +14,7 @@ from ..models.models import (
     TopicSubscription,
 )
 from ..scrapers.arxiv import ArxivScraper
+from ..scrapers.pubmed import PubMedScraper
 from ..scrapers.semantic_scholar import SemanticScholarScraper
 from .ai import AIService
 
@@ -56,11 +57,13 @@ class PipelineService:
         arxiv_scraper: ScraperProtocol | None = None,
         s2_scraper: ScraperProtocol | None = None,
         s2_api_key: str = "",
+        pubmed_scraper: ScraperProtocol | None = None,
     ) -> None:
         self.db = db
         self.ai = ai_service or AIService()
         self.arxiv = arxiv_scraper or ArxivScraper()
         self.s2 = s2_scraper or SemanticScholarScraper(api_key=s2_api_key)
+        self.pubmed = pubmed_scraper or PubMedScraper()
 
     # ──────────────────────────────── Public API ────────────────────────────────
 
@@ -128,6 +131,7 @@ class PipelineService:
         for keyword in sub.ai_keywords[:3]:
             all_papers.extend(await self.arxiv.search(keyword, max_results=15, since=since))
             all_papers.extend(await self.s2.search(keyword, max_results=15, since=since))
+            all_papers.extend(await self.pubmed.search(keyword, max_results=15, since=since))
         return all_papers
 
     async def _fetch_researcher_papers(self, sub: ResearcherSubscription, since: datetime) -> list[dict]:
@@ -137,6 +141,7 @@ class PipelineService:
         all_papers.extend(await self.s2.search_author(
             sub.researcher_name, author_id=sub.s2_author_id, max_results=15, since=since,
         ))
+        all_papers.extend(await self.pubmed.search_author(sub.researcher_name, max_results=15, since=since))
         return all_papers
 
     # ──────────────────────────── Private: score & brief ────────────────────────
@@ -277,7 +282,7 @@ class PipelineService:
     def _calculate_credibility(
         venue: str | None,
         venue_type: str | None,
-        citation_count: int,
+        citation_count: int | None,
     ) -> float:
         """Calculate credibility score using the mixed weighting model."""
         venue_score = 5.0  # Default neutral
@@ -295,7 +300,7 @@ class PipelineService:
         elif venue_type == "preprint":
             venue_score = 3.0
 
-        citation_score = min(citation_count / 10.0, 10.0)
+        citation_score = min((citation_count or 0) / 10.0, 10.0)
         return round(0.5 * venue_score + 0.3 * citation_score + 2.0, 1)
 
     # ──────────────────────────────── Private: dedup ────────────────────────────
