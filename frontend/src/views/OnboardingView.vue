@@ -48,7 +48,7 @@ async function confirmAndCreate() {
 
     // Create researcher subscriptions
     const names = researcherNames.value
-      .split(/[,，、\s]+/)
+      .split(/[,，、]+/)
       .map((n) => n.trim())
       .filter(Boolean)
     for (const name of names) {
