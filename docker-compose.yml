@@ -1,8 +1,15 @@
-version: "3.8"
+# Academic Hunter — PostgreSQL with pgvector
+#
+# DATA PERSISTENCE: The pgdata volume preserves your database across restarts.
+# To COMPLETELY RESET the database (lose all data):
+#   docker compose down -v   <-- WARNING: this deletes all users, subscriptions, and papers
+# To restart without data loss:
+#   docker compose down && docker compose up -d   <-- safe, preserves pgdata volume
 
 services:
   db:
     image: pgvector/pgvector:pg16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: hunter
       POSTGRES_PASSWORD: hunter
@@ -11,6 +18,13 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hunter -d academic_hunter"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
 volumes:
   pgdata:
+    name: academic_hunter_pgdata

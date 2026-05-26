@@ -1,6 +1,7 @@
 """Authentication router: register, login, profile."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
@@ -28,7 +29,11 @@ async def register(request: Request, payload: UserRegister, db: AsyncSession = D
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
-    user = await create_user(db, payload.email, payload.password, payload.display_name)
+    try:
+        user = await create_user(db, payload.email, payload.password, payload.display_name)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
     token = create_access_token(user.id)
     return TokenResponse(access_token=token)
 
