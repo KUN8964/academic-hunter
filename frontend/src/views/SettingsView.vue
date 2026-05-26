@@ -104,6 +104,7 @@ async function saveSettings() {
 
 const modelPresets = [
   { label: 'DeepSeek V3', value: 'deepseek-chat' },
+  { label: 'DeepSeek V4 Pro', value: 'deepseek-v4-pro' },
   { label: 'DeepSeek R1', value: 'deepseek-reasoner' },
   { label: 'GPT-4o', value: 'gpt-4o' },
   { label: 'GPT-4o-mini', value: 'gpt-4o-mini' },
