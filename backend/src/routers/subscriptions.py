@@ -123,6 +123,7 @@ async def create_researcher_sub(
         orcid=payload.orcid,
         s2_author_id=payload.s2_author_id,
         dblp_pid=payload.dblp_pid,
+        ai_keywords=payload.ai_keywords,
     )
     return sub
 

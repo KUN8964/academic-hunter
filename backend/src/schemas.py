@@ -97,6 +97,7 @@ class ResearcherSubscriptionCreate(BaseModel):
     orcid: str | None = None
     s2_author_id: str | None = None
     dblp_pid: str | None = None
+    ai_keywords: list[str] = []
 
 
 class ResearcherSubscriptionUpdate(BaseModel):
