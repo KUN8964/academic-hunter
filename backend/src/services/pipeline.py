@@ -127,21 +127,31 @@ class PipelineService:
 
     async def _fetch_topic_papers(self, sub: TopicSubscription, since: datetime) -> list[dict]:
         """Fetch papers from all scrapers for a topic subscription."""
+        # Use ai_keywords if available, otherwise fall back to query_text
+        keywords = sub.ai_keywords if sub.ai_keywords else [sub.query_text]
         all_papers: list[dict] = []
-        for keyword in sub.ai_keywords[:3]:
-            all_papers.extend(await self.arxiv.search(keyword, max_results=15, since=since))
-            all_papers.extend(await self.s2.search(keyword, max_results=15, since=since))
-            all_papers.extend(await self.pubmed.search(keyword, max_results=15, since=since))
+        for keyword in keywords[:3]:
+            for scraper, name in [(self.arxiv, "arXiv"), (self.s2, "Semantic Scholar"), (self.pubmed, "PubMed")]:
+                try:
+                    all_papers.extend(await scraper.search(keyword, max_results=15, since=since))
+                except Exception:
+                    pass  # Best-effort: one source down shouldn't kill the pipeline
         return all_papers
 
     async def _fetch_researcher_papers(self, sub: ResearcherSubscription, since: datetime) -> list[dict]:
         """Fetch papers from all scrapers for a researcher subscription."""
         all_papers: list[dict] = []
-        all_papers.extend(await self.arxiv.search_author(sub.researcher_name, max_results=15, since=since))
-        all_papers.extend(await self.s2.search_author(
-            sub.researcher_name, author_id=sub.s2_author_id, max_results=15, since=since,
-        ))
-        all_papers.extend(await self.pubmed.search_author(sub.researcher_name, max_results=15, since=since))
+        for scraper, name in [(self.arxiv, "arXiv"), (self.pubmed, "PubMed")]:
+            try:
+                all_papers.extend(await scraper.search_author(sub.researcher_name, max_results=15, since=since))
+            except Exception:
+                pass
+        try:
+            all_papers.extend(await self.s2.search_author(
+                sub.researcher_name, author_id=sub.s2_author_id, max_results=15, since=since,
+            ))
+        except Exception:
+            pass
         return all_papers
 
     # ──────────────────────────── Private: score & brief ────────────────────────

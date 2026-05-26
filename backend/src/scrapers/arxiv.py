@@ -14,7 +14,7 @@ def utcnow() -> datetime:
 class ArxivScraper:
     """Fetch papers from arXiv API."""
 
-    BASE_URL = "http://export.arxiv.org/api/query"
+    BASE_URL = "https://export.arxiv.org/api/query"
 
     async def search(self, query: str, max_results: int = 30, since: datetime | None = None) -> list[dict]:
         """Search arXiv for papers matching the query."""
