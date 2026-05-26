@@ -106,6 +106,12 @@ async function deleteResearcher(id: string) {
   researcherSubs.value = researcherSubs.value.filter((s) => s.id !== id)
 }
 
+async function deleteBrief(id: string) {
+  if (!confirm('确定删除这份简报？')) return
+  await api.delete(`/pipeline/briefs/${id}`)
+  briefs.value = briefs.value.filter(b => b.id !== id)
+}
+
 function getSubName(brief: Brief): string {
   const topic = topicSubs.value.find(s => s.id === brief.subscription_id)
   if (topic) return topic.query_text || '(未命名)'
@@ -192,7 +198,7 @@ function getSubName(brief: Brief): string {
         暂无简报。点击上方「立即运行 Pipeline」生成第一份简报。
       </div>
       <div v-for="brief in briefs" :key="brief.id"
-        class="p-4 bg-zinc-900 border border-zinc-800 rounded-lg mb-3 hover:border-zinc-700 transition cursor-pointer"
+        class="p-4 bg-zinc-900 border border-zinc-800 rounded-lg mb-3 hover:border-zinc-700 transition cursor-pointer group"
         @click="router.push(`/briefs/${brief.id}`)">
         <div class="flex items-center justify-between">
           <div>
@@ -201,7 +207,7 @@ function getSubName(brief: Brief): string {
           </div>
           <div class="flex items-center gap-2">
             <span class="text-xs text-zinc-500">{{ brief.papers?.length || 0 }} 篇论文</span>
-            <span class="text-zinc-600 text-xs">→</span>
+            <button @click.stop="deleteBrief(brief.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
           </div>
         </div>
       </div>

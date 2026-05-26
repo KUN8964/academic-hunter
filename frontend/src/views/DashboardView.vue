@@ -116,6 +116,12 @@ async function deleteResearcher(id: string) {
   await api.delete(`/subscriptions/researchers/${id}`)
   researcherSubs.value = researcherSubs.value.filter(s => s.id !== id)
 }
+
+async function deleteBrief(id: string) {
+  if (!confirm('确定删除这份简报？')) return
+  await api.delete(`/pipeline/briefs/${id}`)
+  briefs.value = briefs.value.filter(b => b.id !== id)
+}
 </script>
 
 <template>
@@ -208,7 +214,7 @@ async function deleteResearcher(id: string) {
         <h2 class="text-lg font-semibold text-zinc-300 mb-4">最新简报</h2>
         <div class="grid gap-2">
           <div v-for="brief in briefs.slice(0, 10)" :key="brief.id"
-            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-zinc-700 transition cursor-pointer flex items-center justify-between"
+            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-zinc-700 transition cursor-pointer flex items-center justify-between group"
             @click="router.push(`/briefs/${brief.id}`)">
             <div>
               <span class="text-white text-sm">{{ brief.date }}</span>
@@ -216,7 +222,7 @@ async function deleteResearcher(id: string) {
             </div>
             <div class="flex items-center gap-2">
               <span class="text-xs text-zinc-500">{{ brief.papers?.length || 0 }} 篇</span>
-              <span class="text-zinc-600 text-xs">→</span>
+              <button @click.stop="deleteBrief(brief.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
             </div>
           </div>
         </div>

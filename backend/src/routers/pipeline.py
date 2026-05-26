@@ -116,3 +116,23 @@ async def get_brief(
     if not brief:
         raise HTTPException(status_code=404, detail="Brief not found")
     return brief
+
+
+@router.delete("/briefs/{brief_id}", status_code=204)
+async def delete_brief(
+    brief_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a specific daily brief. Only the owner can delete."""
+    result = await db.execute(
+        select(DailyBrief).where(
+            DailyBrief.id == brief_id,
+            DailyBrief.user_id == current_user.id,
+        )
+    )
+    brief = result.scalar_one_or_none()
+    if not brief:
+        raise HTTPException(status_code=404, detail="Brief not found")
+    await db.delete(brief)
+    await db.commit()
