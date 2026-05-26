@@ -57,7 +57,9 @@ async function confirmAndCreate() {
       if (r.field) fieldMap[r.name.toLowerCase()] = r.field
     }
     for (const name of names) {
-      const field = fieldMap[name.toLowerCase()]
+      let field = fieldMap[name.toLowerCase()]
+      // Truncate long field names to 8 chars max
+      if (field && field.length > 8) field = field.slice(0, 8)
       const tags = field ? [field] : []
       // Also tag with domain name for cascade lookup
       if (!tags.includes(queryText.value.trim())) {
