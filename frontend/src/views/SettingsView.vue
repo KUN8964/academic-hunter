@@ -48,6 +48,9 @@ async function loadSettings() {
     if (cfg.ai_api_key) {
       settings.value.ai_api_key_masked = 'sk-...' + cfg.ai_api_key.slice(-4)
     }
+    if (cfg.s2_api_key) {
+      settings.value.s2_api_key_masked = '...' + cfg.s2_api_key.slice(-4)
+    }
   }
   loading.value = false
 }
@@ -82,11 +85,17 @@ async function saveSettings() {
       form.value.ai_base_url,
       form.value.ai_model,
     )
+    if (form.value.s2_api_key) {
+      localStorage.setItem('guest_s2_key', form.value.s2_api_key)
+    } else if (form.value.s2_api_key === '') {
+      localStorage.removeItem('guest_s2_key')
+    }
     const cfg = getGuestConfig()
     if (cfg.ai_api_key) {
       settings.value.ai_api_key_masked = 'sk-...' + cfg.ai_api_key.slice(-4)
     }
     form.value.ai_api_key = ''
+    form.value.s2_api_key = ''
     message.value = '设置已保存到本地'
   }
 

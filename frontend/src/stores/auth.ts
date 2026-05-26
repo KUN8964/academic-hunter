@@ -25,6 +25,7 @@ export function getGuestConfig() {
     ai_api_key: localStorage.getItem('guest_api_key') || '',
     ai_base_url: localStorage.getItem('guest_base_url') || '',
     ai_model: localStorage.getItem('guest_model') || '',
+    s2_api_key: localStorage.getItem('guest_s2_key') || '',
   }
 }
 
@@ -45,6 +46,8 @@ export async function login(email: string, password: string) {
   auth.token = data.access_token
   localStorage.setItem('token', data.access_token)
   await fetchUser()
+  // Merge guest settings if they exist (guest used before login)
+  await migrateGuestSettings()
 }
 
 export async function register(email: string, password: string, display_name?: string) {
@@ -52,6 +55,8 @@ export async function register(email: string, password: string, display_name?: s
   auth.token = data.access_token
   localStorage.setItem('token', data.access_token)
   await fetchUser()
+  // Migrate guest API settings to the new account
+  await migrateGuestSettings()
 }
 
 export async function fetchUser() {
@@ -69,4 +74,36 @@ export function logout() {
   auth.token = null
   auth.user = null
   localStorage.removeItem('token')
+}
+
+// ── Guest → Account migration ──
+
+async function migrateGuestSettings() {
+  const guestKey = localStorage.getItem('guest_api_key')
+  const guestBase = localStorage.getItem('guest_base_url')
+  const guestModel = localStorage.getItem('guest_model')
+  const guestS2 = localStorage.getItem('guest_s2_key')
+
+  if (!guestKey && !guestBase && !guestModel && !guestS2) return
+
+  try {
+    const payload: Record<string, string | null> = {}
+    if (guestKey) payload.ai_api_key = guestKey
+    if (guestBase) payload.ai_base_url = guestBase
+    else payload.ai_base_url = null
+    if (guestModel) payload.ai_model = guestModel
+    else payload.ai_model = null
+    if (guestS2) payload.s2_api_key = guestS2
+    else payload.s2_api_key = null
+
+    await api.put('/auth/settings', payload)
+
+    // Clear guest localStorage after successful migration
+    localStorage.removeItem('guest_api_key')
+    localStorage.removeItem('guest_base_url')
+    localStorage.removeItem('guest_model')
+    localStorage.removeItem('guest_s2_key')
+  } catch {
+    // Silent — migration is best-effort
+  }
 }

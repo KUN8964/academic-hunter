@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { auth, fetchUser } from '../stores/auth'
 import api from '../api'
 
 interface Sub {
@@ -23,9 +24,30 @@ const topicSubs = ref<Sub[]>([])
 const researcherSubs = ref<Sub[]>([])
 const briefs = ref<Brief[]>([])
 const loading = ref(true)
+const error = ref('')
 const running = ref(false)
+const runStatus = ref('')
+const runProgress = ref(0)
 
 onMounted(async () => {
+  if (!auth.user && auth.token) {
+    try {
+      await fetchUser()
+    } catch {
+      router.push('/login')
+      return
+    }
+  }
+  if (!auth.token) {
+    router.push('/login')
+    return
+  }
+  await loadData()
+})
+
+async function loadData() {
+  loading.value = true
+  error.value = ''
   try {
     const [t, r, b] = await Promise.all([
       api.get('/subscriptions/topics'),
@@ -35,21 +57,23 @@ onMounted(async () => {
     topicSubs.value = t.data
     researcherSubs.value = r.data
     briefs.value = b.data
-  } catch (e) {
-    console.error(e)
+  } catch (e: any) {
+    if (e.response?.status === 401) {
+      router.push('/login')
+      return
+    }
+    error.value = '数据加载失败'
   } finally {
     loading.value = false
   }
-const runStatus = ref('')
-const runProgress = ref(0)
+}
 
 async function runPipeline() {
   running.value = true
-  runStatus.value = '正在搜索 arXiv...'
+  runStatus.value = '正在搜索论文...'
   runProgress.value = 10
   try {
     await api.post('/pipeline/run')
-    // Poll for briefs every 3 seconds, up to 30s
     runStatus.value = '正在评分和生成简报...'
     runProgress.value = 50
     for (let i = 0; i < 10; i++) {
@@ -65,7 +89,6 @@ async function runPipeline() {
       runStatus.value = `等待中... (${(i + 1) * 3}s)`
     }
     if (briefs.value.length === 0) {
-      // Final attempt
       const { data } = await api.get('/pipeline/briefs')
       briefs.value = data
       runStatus.value = briefs.value.length > 0 ? '完成！' : '未找到新论文，请确认订阅有关键词'
@@ -90,7 +113,7 @@ function goOnboarding() {
       <div class="flex items-center gap-3">
         <button @click="runPipeline" :disabled="running"
           class="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm rounded-lg transition">
-          {{ running ? '运行中...' : '⚡ 运行 Pipeline' }}
+          {{ running ? '运行中...' : '运行 Pipeline' }}
         </button>
         <button @click="goOnboarding"
           class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition">
@@ -110,66 +133,81 @@ function goOnboarding() {
       </div>
     </div>
 
-    <!-- Empty state -->
-    <div v-if="!loading && topicSubs.length === 0 && researcherSubs.length === 0"
-      class="text-center py-20">
-      <p class="text-zinc-500 text-lg mb-4">还没有任何订阅</p>
-      <p class="text-zinc-600 mb-6">创建你的第一个订阅，开始追踪研究动态</p>
-      <button @click="goOnboarding"
-        class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition">
-        开始引导
-      </button>
+    <!-- Error -->
+    <div v-if="error"
+      class="p-4 bg-red-950/30 border border-red-900/30 rounded-lg text-red-400 text-sm mb-6 flex items-center gap-3">
+      <span>{{ error }}</span>
+      <button @click="loadData" class="text-red-300 hover:text-red-200 underline text-xs">重试</button>
     </div>
 
-    <!-- Subscriptions -->
-    <section v-if="topicSubs.length > 0" class="mb-6">
-      <h2 class="text-lg font-semibold text-zinc-300 mb-4">📚 领域订阅 ({{ topicSubs.length }})</h2>
-      <div class="grid gap-2">
-        <div v-for="sub in topicSubs" :key="sub.id"
-          class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between">
-          <span class="text-white text-sm">{{ sub.query_text }}</span>
-          <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
-            {{ sub.status === 'active' ? '活跃' : '暂停' }}
-          </span>
-        </div>
-      </div>
-    </section>
-
-    <section v-if="researcherSubs.length > 0" class="mb-8">
-      <h2 class="text-lg font-semibold text-zinc-300 mb-4">👤 研究者追踪 ({{ researcherSubs.length }})</h2>
-      <div class="grid gap-2">
-        <div v-for="sub in researcherSubs" :key="sub.id"
-          class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between">
-          <span class="text-white text-sm">{{ sub.researcher_name }}</span>
-          <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
-            {{ sub.status === 'active' ? '活跃' : '暂停' }}
-          </span>
-        </div>
-      </div>
-    </section>
-
-    <!-- Recent Briefs -->
-    <section v-if="briefs.length > 0">
-      <h2 class="text-lg font-semibold text-zinc-300 mb-4">📰 最新简报</h2>
-      <div class="grid gap-2">
-        <div v-for="brief in briefs.slice(0, 10)" :key="brief.id"
-          class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-zinc-700 transition cursor-pointer flex items-center justify-between"
-          @click="router.push(`/briefs/${brief.id}`)">
-          <div>
-            <span class="text-white text-sm">{{ brief.date }}</span>
-            <span class="text-xs text-zinc-500 ml-2">{{ brief.subscription_type === 'researcher' ? '👤' : '📚' }}</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-zinc-500">{{ brief.papers?.length || 0 }} 篇</span>
-            <span class="text-zinc-600 text-xs">→</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <div v-if="!loading && topicSubs.length > 0 && briefs.length === 0" class="text-center py-10">
-      <p class="text-zinc-500 text-sm mb-2">还没有简报</p>
-      <p class="text-zinc-600 text-xs">点击上方「运行 Pipeline」生成第一份每日简报</p>
+    <!-- Loading -->
+    <div v-if="loading" class="text-center py-20">
+      <div class="inline-block w-6 h-6 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-3"></div>
+      <p class="text-zinc-500 text-sm">加载中...</p>
     </div>
+
+    <template v-if="!loading && !error">
+      <!-- Empty state -->
+      <div v-if="topicSubs.length === 0 && researcherSubs.length === 0"
+        class="text-center py-20">
+        <p class="text-zinc-500 text-lg mb-4">还没有任何订阅</p>
+        <p class="text-zinc-600 mb-6">创建你的第一个订阅，开始追踪研究动态</p>
+        <button @click="goOnboarding"
+          class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition">
+          开始引导
+        </button>
+      </div>
+
+      <!-- Subscriptions -->
+      <section v-if="topicSubs.length > 0" class="mb-6">
+        <h2 class="text-lg font-semibold text-zinc-300 mb-4">领域订阅 ({{ topicSubs.length }})</h2>
+        <div class="grid gap-2">
+          <div v-for="sub in topicSubs" :key="sub.id"
+            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between">
+            <span class="text-white text-sm">{{ sub.query_text }}</span>
+            <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
+              {{ sub.status === 'active' ? '活跃' : '暂停' }}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section v-if="researcherSubs.length > 0" class="mb-8">
+        <h2 class="text-lg font-semibold text-zinc-300 mb-4">研究者追踪 ({{ researcherSubs.length }})</h2>
+        <div class="grid gap-2">
+          <div v-for="sub in researcherSubs" :key="sub.id"
+            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex items-center justify-between">
+            <span class="text-white text-sm">{{ sub.researcher_name }}</span>
+            <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
+              {{ sub.status === 'active' ? '活跃' : '暂停' }}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recent Briefs -->
+      <section v-if="briefs.length > 0">
+        <h2 class="text-lg font-semibold text-zinc-300 mb-4">最新简报</h2>
+        <div class="grid gap-2">
+          <div v-for="brief in briefs.slice(0, 10)" :key="brief.id"
+            class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-zinc-700 transition cursor-pointer flex items-center justify-between"
+            @click="router.push(`/briefs/${brief.id}`)">
+            <div>
+              <span class="text-white text-sm">{{ brief.date }}</span>
+              <span class="text-xs text-zinc-500 ml-2">{{ brief.subscription_type === 'researcher' ? '研究者' : '领域' }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-zinc-500">{{ brief.papers?.length || 0 }} 篇</span>
+              <span class="text-zinc-600 text-xs">→</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div v-if="topicSubs.length > 0 && briefs.length === 0 && !runStatus" class="text-center py-10">
+        <p class="text-zinc-500 text-sm mb-2">还没有简报</p>
+        <p class="text-zinc-600 text-xs">点击上方「运行 Pipeline」生成第一份每日简报</p>
+      </div>
+    </template>
   </div>
 </template>
