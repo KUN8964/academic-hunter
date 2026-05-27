@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     brief_max_papers: int = 20
 
     # Time window
-    daily_window_hours: int = 24
+    daily_window_hours: int = 0  # 0 = no time limit (fetch all papers)
     weekly_window_days: int = 7
 
     # Semantic Scholar

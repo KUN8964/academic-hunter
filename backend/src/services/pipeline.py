@@ -102,7 +102,7 @@ class PipelineService:
 
     async def run_daily_brief_for_topic(self, subscription: TopicSubscription) -> DailyBrief | None:
         """Run the daily pipeline for a topic subscription."""
-        since = utcnow() - timedelta(hours=settings.daily_window_hours)
+        since = None if settings.daily_window_hours == 0 else utcnow() - timedelta(hours=settings.daily_window_hours)
 
         # 1. Fetch from all sources
         all_papers = await self._fetch_topic_papers(subscription, since)
@@ -119,7 +119,7 @@ class PipelineService:
 
     async def run_daily_brief_for_researcher(self, subscription: ResearcherSubscription) -> DailyBrief | None:
         """Run the daily pipeline for a researcher subscription."""
-        since = utcnow() - timedelta(hours=settings.daily_window_hours)
+        since = None if settings.daily_window_hours == 0 else utcnow() - timedelta(hours=settings.daily_window_hours)
 
         # 1. Fetch from all sources
         all_papers = await self._fetch_researcher_papers(subscription, since)
@@ -162,7 +162,7 @@ class PipelineService:
 
     # ──────────────────────────────── Private: fetch ────────────────────────────
 
-    async def _fetch_topic_papers(self, sub: TopicSubscription, since: datetime) -> list[dict]:
+    async def _fetch_topic_papers(self, sub: TopicSubscription, since: datetime | None) -> list[dict]:
         """Fetch papers for a topic subscription.
 
         Merges all keywords into a single S2 query (OR-separated) to save credits.
@@ -170,6 +170,9 @@ class PipelineService:
         """
         # Use ai_keywords if available, otherwise fall back to query_text
         keywords = sub.ai_keywords if sub.ai_keywords else [sub.query_text]
+        keywords = [k for k in keywords if k.strip()]  # filter empty
+        if not keywords:
+            return []  # nothing to search
         all_papers: list[dict] = []
 
         # S2: merge keywords into one query (costs 1 credit instead of N)
@@ -191,7 +194,7 @@ class PipelineService:
 
         return all_papers
 
-    async def _fetch_researcher_papers(self, sub: ResearcherSubscription, since: datetime) -> list[dict]:
+    async def _fetch_researcher_papers(self, sub: ResearcherSubscription, since: datetime | None) -> list[dict]:
         """Fetch papers from all scrapers for a researcher subscription."""
         all_papers: list[dict] = []
 
@@ -247,25 +250,27 @@ class PipelineService:
         qualified.sort(key=lambda x: x.credibility_score or 0, reverse=True)
         top_papers = qualified[: settings.brief_max_papers]
 
-        # 5. Generate brief
-        papers_data = [
-            {
-                "title": p.title,
-                "authors": [a.get("name", "") for a in (p.authors or [])],
-                "venue": p.venue or "Preprint",
-                "score": p.credibility_score or 0,
-                "summary_zh": p.ai_abstract_zh or "",
-            }
-            for p in top_papers
-        ]
-
-        try:
-            brief_md = await self.ai.generate_daily_brief(
-                papers=papers_data,
-                subscription_name=subscription_name,
-                date=utcnow().strftime("%Y-%m-%d"),
-            )
-        except Exception:
+        # 5. Generate brief (skip AI if no key)
+        if self.ai.api_key:
+            papers_data = [
+                {
+                    "title": p.title,
+                    "authors": [a.get("name", "") for a in (p.authors or [])],
+                    "venue": p.venue or "Preprint",
+                    "score": p.credibility_score or 0,
+                    "summary_zh": p.ai_abstract_zh or "",
+                }
+                for p in top_papers
+            ]
+            try:
+                brief_md = await self.ai.generate_daily_brief(
+                    papers=papers_data,
+                    subscription_name=subscription_name,
+                    date=utcnow().strftime("%Y-%m-%d"),
+                )
+            except Exception:
+                brief_md = f"## {subscription_name} 每日简报\n\n共 {len(top_papers)} 篇论文"
+        else:
             brief_md = f"## {subscription_name} 每日简报\n\n共 {len(top_papers)} 篇论文"
 
         # 6. Save brief
