@@ -35,6 +35,9 @@ const selectedSubs = ref<Set<string>>(new Set())
 const runningSubs = ref<Set<string>>(new Set())
 const subRunStatus = ref<Record<string, string>>({})
 
+// Collapse
+const showAllResearchers = ref(false)
+
 // Tag editing
 const editingTag = ref<string | null>(null)
 const newTag = ref('')
@@ -230,12 +233,16 @@ function getLatestBriefDate(subId: string): string | null {
 
       <!-- Researcher -->
       <section class="mb-10">
-        <h2 class="text-lg font-semibold text-zinc-300 mb-4">
+        <h2 class="text-lg font-semibold text-zinc-300 mb-4"
+          @click="showAllResearchers = !showAllResearchers"
+          style="cursor:pointer">
           研究者追踪 <span class="text-zinc-600 text-sm">({{ researcherSubs.length }})</span>
+          <span v-if="researcherSubs.length > 5" class="text-xs text-zinc-500 ml-1">{{ showAllResearchers ? '▲ 收起' : '▼ 展开' }}</span>
         </h2>
         <div v-if="researcherSubs.length === 0 && !loading" class="text-zinc-500 text-sm">暂无研究者追踪</div>
-        <div v-for="sub in researcherSubs" :key="sub.id"
-          @click="toggleSelect(sub.id)"
+        <template v-for="sub in (showAllResearchers ? researcherSubs : researcherSubs.slice(0, 5))" :key="sub.id">
+          <div
+            @click="toggleSelect(sub.id)"
           class="p-4 rounded-lg border cursor-pointer transition mb-3 group"
           :class="selectedSubs.has(sub.id) ? 'bg-blue-950/30 border-blue-700' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'">
           <div class="flex items-center justify-between">
@@ -271,6 +278,7 @@ function getLatestBriefDate(subId: string): string | null {
             <span>创建于 {{ new Date(sub.created_at).toLocaleDateString('zh-CN') }}</span>
             <span v-if="getLatestBriefDate(sub.id)">最新论文 {{ getLatestBriefDate(sub.id) }}</span>
           </div>
+          </template>
         </div>
       </section>
 
