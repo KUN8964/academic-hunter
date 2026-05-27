@@ -70,11 +70,13 @@ class UserSettingsResponse(BaseModel):
 class TopicSubscriptionCreate(BaseModel):
     query_text: str
     ai_keywords: list[str] = []
+    journal_name: str | None = None  # For journal-type sources (e.g., STTT)
 
 
 class TopicSubscriptionUpdate(BaseModel):
     query_text: str | None = None
     ai_keywords: list[str] | None = None
+    journal_name: str | None = None
     status: str | None = None
 
 
@@ -83,6 +85,7 @@ class TopicSubscriptionResponse(BaseModel):
     user_id: str
     query_text: str
     ai_keywords: list
+    journal_name: str | None = None
     status: str
     created_at: datetime
     updated_at: datetime

@@ -171,8 +171,11 @@ class PipelineService:
         # Use ai_keywords if available, otherwise fall back to query_text
         keywords = sub.ai_keywords if sub.ai_keywords else [sub.query_text]
         keywords = [k for k in keywords if k.strip()]  # filter empty
-        if not keywords:
+        if not keywords and not sub.journal_name:
             return []  # nothing to search
+        # If it's a journal source, use journal name as primary keyword
+        if sub.journal_name and not keywords:
+            keywords = [sub.journal_name]
         all_papers: list[dict] = []
 
         # S2: merge keywords into one query (costs 1 credit instead of N)
@@ -228,6 +231,21 @@ class PipelineService:
         """Shared pipeline: dedup → score/save → filter → generate brief."""
         # 2. Deduplicate
         unique_papers = self._dedup_papers(all_papers)
+
+        # 2.5 Journal filter: if topic has a journal_name, keep only papers from that journal
+        if subscription_type == "topic":
+            # Check if this is a journal source
+            from sqlalchemy import select as _sel
+            from ..models.models import TopicSubscription as _TS
+            result = await self.db.execute(_sel(_TS).where(_TS.id == subscription_id))
+            sub = result.scalar_one_or_none()
+            if sub and sub.journal_name:
+                journal_lower = sub.journal_name.lower()
+                unique_papers = [
+                    p for p in unique_papers
+                    if (p.get("venue") and journal_lower in p["venue"].lower())
+                    or (p.get("journal") and journal_lower in str(p["journal"]).lower())
+                ]
 
         # 3. Score and save each paper
         scored_papers = []

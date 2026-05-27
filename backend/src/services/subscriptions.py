@@ -26,13 +26,15 @@ async def get_topic_subscription(db: AsyncSession, subscription_id: str, user_id
 
 
 async def create_topic_subscription(
-    db: AsyncSession, user_id: str, query_text: str, ai_keywords: list[str], embedding: list[float] | None = None
+    db: AsyncSession, user_id: str, query_text: str, ai_keywords: list[str], embedding: list[float] | None = None,
+    journal_name: str | None = None,
 ) -> TopicSubscription:
     sub = TopicSubscription(
         user_id=user_id,
         query_text=query_text,
         ai_keywords=ai_keywords,
         semantic_embedding=embedding,
+        journal_name=journal_name,
     )
     db.add(sub)
     await db.commit()

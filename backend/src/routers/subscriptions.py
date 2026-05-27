@@ -59,6 +59,7 @@ async def create_topic_sub(
         user_id=current_user.id,
         query_text=payload.query_text,
         ai_keywords=payload.ai_keywords,
+        journal_name=payload.journal_name,
     )
     return sub
 

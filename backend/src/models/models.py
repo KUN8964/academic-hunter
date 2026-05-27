@@ -50,6 +50,7 @@ class TopicSubscription(Base):
     user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=False, index=True)
     query_text: Mapped[str] = mapped_column(Text, nullable=False)
     ai_keywords: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    journal_name: Mapped[str | None] = mapped_column(String(300), default=None)  # For journal sources
     semantic_embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
     status: Mapped[str] = mapped_column(String(10), nullable=False, default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
