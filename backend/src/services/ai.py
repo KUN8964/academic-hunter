@@ -60,7 +60,7 @@ class AIService:
             "temperature": temperature,
             "max_tokens": 4096,
         }
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=payload)
             resp.raise_for_status()
             data = resp.json()

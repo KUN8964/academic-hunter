@@ -290,32 +290,33 @@ class PipelineService:
 
         AI operations are best-effort — paper is saved even if AI is unavailable.
         """
-        # AI scoring (best-effort)
+        # AI scoring (best-effort) — skip entirely if no API key configured
         score = 0.0
         summary_zh = None
         tags: list = []
         evaluation = None
-        try:
-            score_result = await self.ai.score_paper(
-                title=p.get("title", ""), abstract=p.get("abstract", "") or "", venue=p.get("venue"),
-            )
-            score = score_result.get("score", 0)
-        except Exception:
-            pass
-        try:
-            summary_result = await self.ai.summarize_paper_zh(
-                p.get("title", ""), p.get("abstract", "") or "",
-            )
-            summary_zh = summary_result.get("summary_zh")
-            tags = summary_result.get("tags", [])
-        except Exception:
-            pass
-        try:
-            evaluation = await self.ai.evaluate_paper(
-                p.get("title", ""), p.get("abstract", "") or "",
-            )
-        except Exception:
-            pass
+        if self.ai.api_key:
+            try:
+                score_result = await self.ai.score_paper(
+                    title=p.get("title", ""), abstract=p.get("abstract", "") or "", venue=p.get("venue"),
+                )
+                score = score_result.get("score", 0)
+            except Exception:
+                pass
+            try:
+                summary_result = await self.ai.summarize_paper_zh(
+                    p.get("title", ""), p.get("abstract", "") or "",
+                )
+                summary_zh = summary_result.get("summary_zh")
+                tags = summary_result.get("tags", [])
+            except Exception:
+                pass
+            try:
+                evaluation = await self.ai.evaluate_paper(
+                    p.get("title", ""), p.get("abstract", "") or "",
+                )
+            except Exception:
+                pass
 
         credibility = self._calculate_credibility(
             venue=p.get("venue"), venue_type=p.get("venue_type"), citation_count=p.get("citation_count", 0),

@@ -27,7 +27,7 @@ class ArxivScraper:
             "sortBy": "submittedDate",
             "sortOrder": "descending",
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(self.BASE_URL, params=params)
             resp.raise_for_status()
 
@@ -73,7 +73,7 @@ class ArxivScraper:
             "sortBy": "submittedDate",
             "sortOrder": "descending",
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(self.BASE_URL, params=params)
             resp.raise_for_status()
 
