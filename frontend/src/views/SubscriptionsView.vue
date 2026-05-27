@@ -281,7 +281,6 @@ function getLatestBriefDate(subId: string): string | null {
           </div>
           </div>
           </template>
-        </div>
       </section>
 
       <!-- Briefs -->
