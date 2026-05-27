@@ -40,10 +40,10 @@ class Settings(BaseSettings):
             raise ValueError("DATABASE_URL must be set")
         return v
 
-    # DeepSeek AI
-    deepseek_api_key: str = ""
-    deepseek_base_url: str = "https://api.deepseek.com/v1"
-    deepseek_model: str = "deepseek-chat"
+    # AI (OpenAI-compatible — any provider: DeepSeek, OpenAI, Claude, etc.)
+    ai_api_key: str = ""
+    ai_base_url: str = "https://api.deepseek.com/v1"
+    ai_model: str = "deepseek-chat"
 
     # AI scoring thresholds
     ai_score_threshold: float = 3.0  # Lower = more papers pass (was 6.0)
@@ -67,8 +67,8 @@ class Settings(BaseSettings):
     ncbi_api_key: str = ""
     ncbi_email: str = ""
 
-    # CORS
-    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    # CORS — must be explicitly set in production
+    cors_origins: str = "http://localhost:5173"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

@@ -5,10 +5,7 @@ from datetime import datetime, timezone
 import httpx
 
 from ..config import settings
-
-
-def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+from ..utils import utcnow
 
 
 class SemanticScholarScraper:

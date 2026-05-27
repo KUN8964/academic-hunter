@@ -12,49 +12,41 @@ class TestDedupPapers:
     """Paper deduplication logic (synchronous pure functions)."""
 
     def test_doi_exact_match(self):
-        from src.services.pipeline import PipelineService
-        from unittest.mock import MagicMock
+        from src.utils import dedup_papers
 
-        svc = PipelineService(MagicMock())
         papers = [
             {"doi": "10.1234/abc", "title": "Paper A", "url": "http://a.com"},
             {"doi": "10.1234/abc", "title": "Paper A (duplicate)", "url": "http://a.com/dup"},
             {"doi": "10.5678/def", "title": "Paper B", "url": "http://b.com"},
         ]
-        result = svc._dedup_papers(papers)
+        result = dedup_papers(papers)
         assert len(result) == 2
 
     def test_url_match_deduplicates(self):
-        from src.services.pipeline import PipelineService
-        from unittest.mock import MagicMock
+        from src.utils import dedup_papers
 
-        svc = PipelineService(MagicMock())
         papers = [
             {"url": "http://same-url.com/paper", "title": "Same Paper"},
             {"url": "http://same-url.com/paper", "title": "Same Paper (dup)"},
         ]
-        result = svc._dedup_papers(papers)
+        result = dedup_papers(papers)
         assert len(result) == 1
 
     def test_no_doi_no_url_keeps_all(self):
-        from src.services.pipeline import PipelineService
-        from unittest.mock import MagicMock
+        from src.utils import dedup_papers
 
-        svc = PipelineService(MagicMock())
         papers = [
             {"title": "Paper A", "url": ""},
             {"title": "Paper B", "url": ""},
             {"title": "Paper C", "url": ""},
         ]
-        result = svc._dedup_papers(papers)
+        result = dedup_papers(papers)
         assert len(result) == 3
 
     def test_empty_list(self):
-        from src.services.pipeline import PipelineService
-        from unittest.mock import MagicMock
+        from src.utils import dedup_papers
 
-        svc = PipelineService(MagicMock())
-        result = svc._dedup_papers([])
+        result = dedup_papers([])
         assert result == []
 
 

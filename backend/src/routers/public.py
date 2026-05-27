@@ -14,27 +14,9 @@ from ..schemas import (
 from ..scrapers.arxiv import ArxivScraper
 from ..scrapers.pubmed import PubMedScraper
 from ..scrapers.semantic_scholar import SemanticScholarScraper
+from ..utils import dedup_papers
 
 logger = logging.getLogger(__name__)
-
-
-def _dedup_papers(papers: list[dict]) -> list[dict]:
-    seen_dois: set[str] = set()
-    seen_urls: set[str] = set()
-    unique: list[dict] = []
-    for p in papers:
-        doi = p.get("doi")
-        url = p.get("url", "")
-        if doi and doi in seen_dois:
-            continue
-        if url and url in seen_urls:
-            continue
-        if doi:
-            seen_dois.add(doi)
-        if url:
-            seen_urls.add(url)
-        unique.append(p)
-    return unique
 
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -79,7 +61,7 @@ async def public_search(payload: PublicSearchRequest):
     if not pubmed_ok:
         warnings.append("PubMed 暂不可用，结果仅来自 arXiv 和 Semantic Scholar")
 
-    unique = _dedup_papers(all_papers)
+    unique = dedup_papers(all_papers)
 
     papers = []
     for p in unique[:30]:

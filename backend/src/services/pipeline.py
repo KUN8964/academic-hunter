@@ -16,6 +16,7 @@ from ..models.models import (
 from ..scrapers.arxiv import ArxivScraper
 from ..scrapers.pubmed import PubMedScraper
 from ..scrapers.semantic_scholar import SemanticScholarScraper
+from ..utils import dedup_papers, utcnow
 from .ai import AIService
 
 
@@ -36,10 +37,6 @@ class AIServiceProtocol(Protocol):
     async def summarize_paper_zh(self, title: str, abstract: str) -> dict: ...
     async def evaluate_paper(self, title: str, abstract: str) -> str: ...
     async def generate_daily_brief(self, papers: list[dict], subscription_name: str, date: str) -> str: ...
-
-
-def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 class PipelineService:
@@ -230,14 +227,11 @@ class PipelineService:
     ) -> DailyBrief | None:
         """Shared pipeline: dedup → score/save → filter → generate brief."""
         # 2. Deduplicate
-        unique_papers = self._dedup_papers(all_papers)
+        unique_papers = dedup_papers(all_papers)
 
         # 2.5 Journal filter: if topic has a journal_name, keep only papers from that journal
         if subscription_type == "topic":
-            # Check if this is a journal source
-            from sqlalchemy import select as _sel
-            from ..models.models import TopicSubscription as _TS
-            result = await self.db.execute(_sel(_TS).where(_TS.id == subscription_id))
+            result = await self.db.execute(select(TopicSubscription).where(TopicSubscription.id == subscription_id))
             sub = result.scalar_one_or_none()
             if sub and sub.journal_name:
                 journal_lower = sub.journal_name.lower()
@@ -395,32 +389,6 @@ class PipelineService:
 
         citation_score = min((citation_count or 0) / 10.0, 10.0)
         return round(0.5 * venue_score + 0.3 * citation_score + 2.0, 1)
-
-    # ──────────────────────────────── Private: dedup ────────────────────────────
-
-    @staticmethod
-    def _dedup_papers(papers: list[dict]) -> list[dict]:
-        """Deduplicate papers: DOI exact match first, then URL-based."""
-        seen_dois: set[str] = set()
-        seen_urls: set[str] = set()
-        unique: list[dict] = []
-
-        for p in papers:
-            doi = p.get("doi")
-            url = p.get("url", "")
-
-            if doi and doi in seen_dois:
-                continue
-            if url and url in seen_urls:
-                continue
-
-            if doi:
-                seen_dois.add(doi)
-            if url:
-                seen_urls.add(url)
-            unique.append(p)
-
-        return unique
 
     # ──────────────────────────────── Private: lookup ───────────────────────────
 

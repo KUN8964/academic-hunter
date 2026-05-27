@@ -6,10 +6,7 @@ import xml.etree.ElementTree as ET
 import httpx
 
 from ..config import settings
-
-
-def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+from ..utils import utcnow
 
 
 class PubMedScraper:

@@ -27,9 +27,9 @@ class AIService:
         base_url: str = "",
         model: str = "",
     ) -> None:
-        self.api_key = api_key or settings.deepseek_api_key
-        self.base_url = base_url or settings.deepseek_base_url
-        self.model = model or settings.deepseek_model
+        self.api_key = api_key or settings.ai_api_key
+        self.base_url = base_url or settings.ai_base_url
+        self.model = model or settings.ai_model
 
     @classmethod
     def from_user(cls, user: User) -> AIService:
