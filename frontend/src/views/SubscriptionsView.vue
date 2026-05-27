@@ -243,8 +243,9 @@ function getLatestBriefDate(subId: string): string | null {
         <template v-for="sub in (showAllResearchers ? researcherSubs : researcherSubs.slice(0, 5))" :key="sub.id">
           <div
             @click="toggleSelect(sub.id)"
-          class="p-4 rounded-lg border cursor-pointer transition mb-3 group"
-          :class="selectedSubs.has(sub.id) ? 'bg-blue-950/30 border-blue-700' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'">
+            class="p-4 rounded-lg border cursor-pointer transition mb-3 group"
+            :class="selectedSubs.has(sub.id) ? 'bg-blue-950/30 border-blue-700' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'"
+          >
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span :class="selectedSubs.has(sub.id) ? 'text-blue-400' : 'text-zinc-700'" class="text-sm">●</span>
@@ -277,6 +278,7 @@ function getLatestBriefDate(subId: string): string | null {
           <div class="text-xs text-zinc-600 mt-2 flex gap-4">
             <span>创建于 {{ new Date(sub.created_at).toLocaleDateString('zh-CN') }}</span>
             <span v-if="getLatestBriefDate(sub.id)">最新论文 {{ getLatestBriefDate(sub.id) }}</span>
+          </div>
           </div>
           </template>
         </div>
