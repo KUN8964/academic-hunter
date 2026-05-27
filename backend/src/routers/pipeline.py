@@ -12,6 +12,7 @@ from ..schemas import DailyBriefResponse
 from ..services.ai import AIService
 from ..services.auth_middleware import get_current_user
 from ..services.pipeline import PipelineService
+from ..crypto import decrypt_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ async def trigger_daily_run(
                     logger.warning("Pipeline: user %s not found in background session", user_id)
                     return
                 ai = AIService.from_user(user)
-                svc = PipelineService(session, ai_service=ai, s2_api_key=user.s2_api_key or "")
+                svc = PipelineService(session, ai_service=ai, s2_api_key=decrypt_api_key(user.s2_api_key) or "")
                 logger.info("Pipeline: starting run_daily_for_all for user %s", user_id)
                 briefs = await svc.run_daily_for_all(user_id)
                 logger.info("Pipeline: completed — %d briefs generated", len(briefs))
@@ -58,7 +59,7 @@ async def debug_run(current_user: User = Depends(get_current_user)):
             return {"error": "user not found"}
 
         ai = AIService.from_user(user)
-        svc = PipelineService(session, ai_service=ai, s2_api_key=user.s2_api_key or "")
+        svc = PipelineService(session, ai_service=ai, s2_api_key=decrypt_api_key(user.s2_api_key) or "")
 
         # Check subscriptions
         from ..models.models import TopicSubscription as TS
@@ -165,7 +166,7 @@ async def run_single_topic(
         raise HTTPException(status_code=404, detail="Topic subscription not found")
 
     ai = AIService.from_user(current_user)
-    svc = PipelineService(db, ai_service=ai, s2_api_key=current_user.s2_api_key or "")
+    svc = PipelineService(db, ai_service=ai, s2_api_key=decrypt_api_key(current_user.s2_api_key) or "")
 
     credits_before = svc.s2.credits_remaining if hasattr(svc.s2, "credits_remaining") else None
     brief = await svc.run_daily_brief_for_topic(sub)
@@ -209,7 +210,7 @@ async def run_single_researcher(
         raise HTTPException(status_code=404, detail="Researcher subscription not found")
 
     ai = AIService.from_user(current_user)
-    svc = PipelineService(db, ai_service=ai, s2_api_key=current_user.s2_api_key or "")
+    svc = PipelineService(db, ai_service=ai, s2_api_key=decrypt_api_key(current_user.s2_api_key) or "")
 
     credits_before = svc.s2.credits_remaining if hasattr(svc.s2, "credits_remaining") else None
     brief = await svc.run_daily_brief_for_researcher(sub)

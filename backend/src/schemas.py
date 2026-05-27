@@ -50,16 +50,18 @@ class UserSettingsResponse(BaseModel):
 
     @classmethod
     def from_user(cls, user) -> "UserSettingsResponse":
+        from ..crypto import decrypt_api_key
+
         def _mask(key: str | None) -> str | None:
             if not key:
                 return None
             return "..." + key[-4:] if len(key) > 4 else "****"
 
         return cls(
-            ai_api_key_masked=_mask(user.ai_api_key),
+            ai_api_key_masked=_mask(decrypt_api_key(user.ai_api_key)),
             ai_base_url=user.ai_base_url,
             ai_model=user.ai_model,
-            s2_api_key_masked=_mask(user.s2_api_key),
+            s2_api_key_masked=_mask(decrypt_api_key(user.s2_api_key)),
         )
 
     model_config = {"from_attributes": True}

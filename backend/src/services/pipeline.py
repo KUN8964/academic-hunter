@@ -54,12 +54,14 @@ class PipelineService:
         arxiv_scraper: ScraperProtocol | None = None,
         s2_scraper: ScraperProtocol | None = None,
         s2_api_key: str = "",
+        s2_credit_budget: int | None = None,
         pubmed_scraper: ScraperProtocol | None = None,
     ) -> None:
         self.db = db
         self.ai = ai_service or AIService()
         self.arxiv = arxiv_scraper or ArxivScraper()
         self.s2 = s2_scraper or SemanticScholarScraper(api_key=s2_api_key)
+        self.s2_credit_budget = s2_credit_budget if s2_credit_budget is not None else settings.s2_credit_budget
         self.pubmed = pubmed_scraper or PubMedScraper()
 
     # ──────────────────────────────── Public API ────────────────────────────────
@@ -146,7 +148,7 @@ class PipelineService:
             return True  # Can't check — assume OK (native S2)
         if credits is None:
             return True  # No credit headers — native S2 API
-        return credits >= settings.s2_credit_budget
+        return credits >= self.s2_credit_budget
 
     def _can_continue(self) -> bool:
         """Check mid-pipeline if we still have credits to continue."""
@@ -155,7 +157,7 @@ class PipelineService:
         credits = self.s2.credits_remaining  # type: ignore[attr-defined]
         if credits is None:
             return True
-        return credits >= settings.s2_credit_budget
+        return credits >= self.s2_credit_budget
 
     # ──────────────────────────────── Private: fetch ────────────────────────────
 

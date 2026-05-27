@@ -34,8 +34,10 @@ class AIService:
     @classmethod
     def from_user(cls, user: User) -> AIService:
         """Create an AIService configured for a specific user."""
+        from ..crypto import decrypt_api_key
+
         return cls(
-            api_key=user.ai_api_key or "",
+            api_key=decrypt_api_key(user.ai_api_key) or "",
             base_url=user.ai_base_url or "",
             model=user.ai_model or "",
         )
