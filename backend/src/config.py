@@ -59,6 +59,9 @@ class Settings(BaseSettings):
 
     # Semantic Scholar
     s2_api_key: str = ""
+    s2_base_url: str = ""  # Empty = use default api.semanticscholar.org
+    # Credit budget (ai4scholar.net proxy)
+    s2_credit_budget: int = 50  # Minimum credits to run pipeline
 
     # NCBI / PubMed
     ncbi_api_key: str = ""

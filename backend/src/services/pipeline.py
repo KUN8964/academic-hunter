@@ -68,10 +68,19 @@ class PipelineService:
     # ──────────────────────────────── Public API ────────────────────────────────
 
     async def run_daily_for_all(self, user_id: str) -> list[DailyBrief]:
-        """Run daily brief generation for all of a user's active subscriptions."""
+        """Run daily brief generation for all of a user's active subscriptions.
+
+        Checks S2 credit budget before running. Skips if credits are below threshold.
+        """
+        # Credit budget check
+        if not await self._has_sufficient_credits():
+            return []
+
         briefs: list[DailyBrief] = []
 
         for sub in await self._get_active_topic_subs(user_id):
+            if not self._can_continue():
+                break
             try:
                 brief = await self.run_daily_brief_for_topic(sub)
                 if brief:
@@ -80,6 +89,8 @@ class PipelineService:
                 continue
 
         for sub in await self._get_active_researcher_subs(user_id):
+            if not self._can_continue():
+                break
             try:
                 brief = await self.run_daily_brief_for_researcher(sub)
                 if brief:
@@ -123,35 +134,82 @@ class PipelineService:
             subscription_name=subscription.researcher_name,
         )
 
+    # ──────────────────────────────── Private: credits ───────────────────────────
+
+    async def _has_sufficient_credits(self) -> bool:
+        """Check if we have enough S2 credits to run the pipeline.
+        Returns False if credits are tracked and below budget.
+        Returns True if credit tracking is unavailable (native S2 API).
+        """
+        if not hasattr(self.s2, "check_credits"):
+            return True  # Non-S2 scraper — no credit tracking
+        try:
+            credits = await self.s2.check_credits()  # type: ignore[attr-defined]
+        except Exception:
+            return True  # Can't check — assume OK (native S2)
+        if credits is None:
+            return True  # No credit headers — native S2 API
+        return credits >= settings.s2_credit_budget
+
+    def _can_continue(self) -> bool:
+        """Check mid-pipeline if we still have credits to continue."""
+        if not hasattr(self.s2, "credits_remaining"):
+            return True
+        credits = self.s2.credits_remaining  # type: ignore[attr-defined]
+        if credits is None:
+            return True
+        return credits >= settings.s2_credit_budget
+
     # ──────────────────────────────── Private: fetch ────────────────────────────
 
     async def _fetch_topic_papers(self, sub: TopicSubscription, since: datetime) -> list[dict]:
-        """Fetch papers from all scrapers for a topic subscription."""
+        """Fetch papers for a topic subscription.
+
+        Merges all keywords into a single S2 query (OR-separated) to save credits.
+        arXiv and PubMed use separate calls (free APIs), best-effort.
+        """
         # Use ai_keywords if available, otherwise fall back to query_text
         keywords = sub.ai_keywords if sub.ai_keywords else [sub.query_text]
         all_papers: list[dict] = []
+
+        # S2: merge keywords into one query (costs 1 credit instead of N)
+        if keywords:
+            s2_keywords = keywords[:5]
+            merged_query = " OR ".join(f'"{kw}"' if " " in kw else kw for kw in s2_keywords)
+            try:
+                all_papers.extend(await self.s2.search(merged_query, max_results=30, since=since))
+            except Exception:
+                pass
+
+        # arXiv + PubMed: per-keyword (free APIs), best-effort
         for keyword in keywords[:3]:
-            for scraper, name in [(self.arxiv, "arXiv"), (self.s2, "Semantic Scholar"), (self.pubmed, "PubMed")]:
+            for scraper, name in [(self.arxiv, "arXiv"), (self.pubmed, "PubMed")]:
                 try:
-                    all_papers.extend(await scraper.search(keyword, max_results=15, since=since))
+                    all_papers.extend(await scraper.search(keyword, max_results=10, since=since))
                 except Exception:
-                    pass  # Best-effort: one source down shouldn't kill the pipeline
+                    pass
+
         return all_papers
 
     async def _fetch_researcher_papers(self, sub: ResearcherSubscription, since: datetime) -> list[dict]:
         """Fetch papers from all scrapers for a researcher subscription."""
         all_papers: list[dict] = []
+
+        # arXiv + PubMed: best-effort
         for scraper, name in [(self.arxiv, "arXiv"), (self.pubmed, "PubMed")]:
             try:
                 all_papers.extend(await scraper.search_author(sub.researcher_name, max_results=15, since=since))
             except Exception:
                 pass
+
+        # S2: primary source
         try:
             all_papers.extend(await self.s2.search_author(
                 sub.researcher_name, author_id=sub.s2_author_id, max_results=15, since=since,
             ))
         except Exception:
             pass
+
         return all_papers
 
     # ──────────────────────────── Private: score & brief ────────────────────────

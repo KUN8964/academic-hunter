@@ -15,20 +15,51 @@ class SemanticScholarScraper:
     """Fetch papers and author data from Semantic Scholar API.
 
     Accepts an optional per-user API key. Falls back to server-level key.
+    Tracks credit consumption via x-credits-remaining response header.
     """
 
     BASE_URL = "https://api.semanticscholar.org/graph/v1"
 
     def __init__(self, api_key: str = "") -> None:
         self._user_key = api_key
+        self._credits_remaining: int | None = None
 
     def _headers(self) -> dict:
         h = {}
         # User key takes priority, then server key
         key = self._user_key or settings.s2_api_key
         if key:
-            h["x-api-key"] = key
+            h["Authorization"] = f"Bearer {key}"
         return h
+
+    @property
+    def _base_url(self) -> str:
+        return settings.s2_base_url or self.BASE_URL
+
+    def _update_credits_from_headers(self, headers) -> None:
+        """Extract credit info from response headers (ai4scholar.net)."""
+        remaining = headers.get("x-credits-remaining")
+        if remaining is not None:
+            self._credits_remaining = int(remaining)
+
+    async def check_credits(self) -> int | None:
+        """Check remaining credits without consuming significant resources.
+        Makes a minimal S2 search (limit=1) and returns credits remaining.
+        Returns None if credit headers are unavailable.
+        """
+        params = {"query": "test", "limit": 1, "fields": "title"}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(
+                f"{self._base_url}/paper/search",
+                params=params,
+                headers=self._headers(),
+            )
+            self._update_credits_from_headers(resp.headers)
+            return self._credits_remaining
+
+    @property
+    def credits_remaining(self) -> int | None:
+        return self._credits_remaining
 
     async def search(
         self,
@@ -44,11 +75,12 @@ class SemanticScholarScraper:
         }
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.get(
-                f"{self.BASE_URL}/paper/search",
+                f"{self._base_url}/paper/search",
                 params=params,
                 headers=self._headers(),
             )
             resp.raise_for_status()
+            self._update_credits_from_headers(resp.headers)
             data = resp.json()
 
         papers = []
@@ -56,7 +88,7 @@ class SemanticScholarScraper:
             pub_date = item.get("publicationDate")
             if pub_date and since:
                 try:
-                    dt = datetime.fromisoformat(pub_date)
+                    dt = datetime.fromisoformat(pub_date).replace(tzinfo=timezone.utc)
                     if dt < since:
                         continue
                 except ValueError:
@@ -122,11 +154,12 @@ class SemanticScholarScraper:
         params = {"query": name, "limit": 1}
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.get(
-                f"{self.BASE_URL}/author/search",
+                f"{self._base_url}/author/search",
                 params=params,
                 headers=self._headers(),
             )
             resp.raise_for_status()
+            self._update_credits_from_headers(resp.headers)
             data = resp.json()
         authors = data.get("data", [])
         return authors[0] if authors else None
@@ -145,11 +178,12 @@ class SemanticScholarScraper:
         }
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.get(
-                f"{self.BASE_URL}/author/{author_id}/papers",
+                f"{self._base_url}/author/{author_id}/papers",
                 params=params,
                 headers=self._headers(),
             )
             resp.raise_for_status()
+            self._update_credits_from_headers(resp.headers)
             data = resp.json()
 
         papers = []
@@ -157,7 +191,7 @@ class SemanticScholarScraper:
             pub_date = item.get("publicationDate")
             if pub_date and since:
                 try:
-                    dt = datetime.fromisoformat(pub_date)
+                    dt = datetime.fromisoformat(pub_date).replace(tzinfo=timezone.utc)
                     if dt < since:
                         continue
                 except ValueError:

@@ -80,6 +80,13 @@ async def debug_run(current_user: User = Depends(get_current_user)):
             info["briefs"] = len(briefs)
         except Exception as e:
             info["error"] = str(e)
+            import traceback
+            info["traceback"] = traceback.format_exc()
+
+        # Credit info
+        if hasattr(svc.s2, "credits_remaining"):
+            info["credits_remaining"] = svc.s2.credits_remaining
+            info["credits_sufficient"] = await svc._has_sufficient_credits()
 
         return info
 
