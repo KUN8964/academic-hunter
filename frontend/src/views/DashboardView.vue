@@ -287,7 +287,10 @@ function doneEditing() { editingTag.value = null; newTag.value = '' }
 
       <!-- Briefs -->
       <section v-if="briefs.length > 0">
-        <h2 class="text-lg font-semibold text-zinc-300 mb-4">最新简报</h2>
+        <h2 class="text-lg font-semibold text-zinc-300 mb-4">
+          最新简报
+          <span class="text-xs text-zinc-500 font-normal ml-2">↓ 从新到旧</span>
+        </h2>
         <div class="grid gap-2">
           <div v-for="brief in briefs.slice(0, 10)" :key="brief.id"
             class="p-3 bg-zinc-900 border border-zinc-800 rounded-lg hover:border-zinc-700 transition cursor-pointer flex items-center justify-between group"

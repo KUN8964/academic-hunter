@@ -287,6 +287,7 @@ function getLatestBriefDate(subId: string): string | null {
       <section>
         <h2 class="text-lg font-semibold text-zinc-300 mb-4">
           每日简报 <span class="text-zinc-600 text-sm">({{ briefs.length }})</span>
+          <span class="text-xs text-zinc-500 font-normal ml-2">↓ 从新到旧</span>
         </h2>
         <div v-if="briefs.length === 0 && !loading" class="text-zinc-500 text-sm">
           暂无简报。选中领域/研究者，点击上方「立即运行」生成。
