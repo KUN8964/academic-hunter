@@ -291,7 +291,10 @@ class PipelineService:
         else:
             brief_md = f"## {subscription_name} 每日简报\n\n共 {len(top_papers)} 篇论文"
 
-        # 6. Save brief
+        # 6. Save brief (skip if no papers)
+        if not top_papers:
+            return None
+
         brief = DailyBrief(
             user_id=user_id,
             subscription_type=subscription_type,
