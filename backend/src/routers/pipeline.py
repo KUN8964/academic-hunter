@@ -143,3 +143,91 @@ async def delete_brief(
         raise HTTPException(status_code=404, detail="Brief not found")
     await db.delete(brief)
     await db.commit()
+
+
+@router.post("/run/topic/{sub_id}")
+async def run_single_topic(
+    sub_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Run pipeline for a single topic subscription. Returns the generated brief."""
+    from ..models.models import TopicSubscription
+
+    result = await db.execute(
+        select(TopicSubscription).where(
+            TopicSubscription.id == sub_id,
+            TopicSubscription.user_id == current_user.id,
+        )
+    )
+    sub = result.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Topic subscription not found")
+
+    ai = AIService.from_user(current_user)
+    svc = PipelineService(db, ai_service=ai, s2_api_key=current_user.s2_api_key or "")
+
+    credits_before = svc.s2.credits_remaining if hasattr(svc.s2, "credits_remaining") else None
+    brief = await svc.run_daily_brief_for_topic(sub)
+    credits_after = svc.s2.credits_remaining if hasattr(svc.s2, "credits_remaining") else None
+
+    if brief is None:
+        return {
+            "brief": None,
+            "message": "未找到新论文（24 小时内无新发表）",
+            "credits_remaining": credits_after,
+        }
+
+    return {
+        "brief": {
+            "id": brief.id,
+            "subscription_type": brief.subscription_type,
+            "date": str(brief.date),
+            "papers": brief.papers,
+        },
+        "credits_remaining": credits_after,
+    }
+
+
+@router.post("/run/researcher/{sub_id}")
+async def run_single_researcher(
+    sub_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Run pipeline for a single researcher subscription. Returns the generated brief."""
+    from ..models.models import ResearcherSubscription
+
+    result = await db.execute(
+        select(ResearcherSubscription).where(
+            ResearcherSubscription.id == sub_id,
+            ResearcherSubscription.user_id == current_user.id,
+        )
+    )
+    sub = result.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Researcher subscription not found")
+
+    ai = AIService.from_user(current_user)
+    svc = PipelineService(db, ai_service=ai, s2_api_key=current_user.s2_api_key or "")
+
+    credits_before = svc.s2.credits_remaining if hasattr(svc.s2, "credits_remaining") else None
+    brief = await svc.run_daily_brief_for_researcher(sub)
+    credits_after = svc.s2.credits_remaining if hasattr(svc.s2, "credits_remaining") else None
+
+    if brief is None:
+        return {
+            "brief": None,
+            "message": "未找到新论文（24 小时内无新发表）",
+            "credits_remaining": credits_after,
+        }
+
+    return {
+        "brief": {
+            "id": brief.id,
+            "subscription_type": brief.subscription_type,
+            "date": str(brief.date),
+            "papers": brief.papers,
+        },
+        "credits_remaining": credits_after,
+    }

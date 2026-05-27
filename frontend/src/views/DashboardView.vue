@@ -27,9 +27,9 @@ const researcherSubs = ref<Sub[]>([])
 const briefs = ref<Brief[]>([])
 const loading = ref(true)
 const error = ref('')
-const running = ref(false)
-const runStatus = ref('')
-const runProgress = ref(0)
+const runningSubs = ref<Set<string>>(new Set())
+const subRunStatus = ref<Record<string, string>>({})
+const subBriefs = ref<Record<string, any>>({})
 
 // Tag editing
 const editingTag = ref<string | null>(null)
@@ -74,36 +74,31 @@ async function loadData() {
   }
 }
 
-async function runPipeline() {
-  running.value = true
-  runStatus.value = '正在搜索论文...'
-  runProgress.value = 10
+async function runSubPipeline(subId: string, type: 'topic' | 'researcher') {
+  runningSubs.value.add(subId)
+  subRunStatus.value[subId] = '搜索中...'
   try {
-    await api.post('/pipeline/run')
-    runStatus.value = '正在评分和生成简报...'
-    runProgress.value = 50
-    for (let i = 0; i < 10; i++) {
-      await new Promise(r => setTimeout(r, 3000))
-      runProgress.value = 50 + i * 5
-      const { data } = await api.get('/pipeline/briefs')
-      if (data.length > briefs.value.length) {
-        briefs.value = data
-        runStatus.value = '完成！'
-        runProgress.value = 100
-        break
-      }
-      runStatus.value = `等待中... (${(i + 1) * 3}s)`
+    const endpoint = type === 'topic'
+      ? `/pipeline/run/topic/${subId}`
+      : `/pipeline/run/researcher/${subId}`
+    const { data } = await api.post(endpoint)
+    if (data.brief) {
+      subBriefs.value[subId] = data.brief
+      subRunStatus.value[subId] = `完成！${data.brief.papers?.length || 0} 篇论文`
+      // Refresh briefs list
+      const b = await api.get('/pipeline/briefs')
+      briefs.value = b.data
+    } else {
+      subRunStatus.value[subId] = data.message || '未找到新论文'
     }
-    if (briefs.value.length === 0) {
-      const { data } = await api.get('/pipeline/briefs')
-      briefs.value = data
-      runStatus.value = briefs.value.length > 0 ? '完成！' : '未找到新论文，请确认订阅有关键词'
-    }
-  } catch {
-    runStatus.value = 'Pipeline 执行失败'
+  } catch (e: any) {
+    subRunStatus.value[subId] = e.response?.data?.detail || '执行失败'
   } finally {
-    running.value = false
-    setTimeout(() => { runStatus.value = ''; runProgress.value = 0 }, 5000)
+    runningSubs.value.delete(subId)
+    setTimeout(() => {
+      delete subRunStatus.value[subId]
+      delete subBriefs.value[subId]
+    }, 8000)
   }
 }
 
@@ -194,27 +189,14 @@ function doneEditing() {
   <div class="max-w-4xl mx-auto px-6 py-10">
     <div class="flex items-center justify-between mb-8">
       <h1 class="text-2xl font-bold text-white">控制台</h1>
-      <div class="flex items-center gap-3">
-        <button @click="runPipeline()" :disabled="running"
-          class="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white text-sm rounded-lg transition">
-          {{ running ? '运行中...' : '运行 Pipeline' }}
-        </button>
-        <button @click="goOnboarding"
-          class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition">
-          + 新建订阅
-        </button>
-      </div>
+      <button @click="goOnboarding"
+        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition">
+        + 新建订阅
+      </button>
     </div>
 
     <!-- Pipeline progress -->
-    <div v-if="runStatus" class="mb-6 p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-sm text-zinc-300">{{ runStatus }}</span>
-        <span class="text-xs text-zinc-500">{{ runProgress }}%</span>
-      </div>
-      <div class="w-full bg-zinc-800 rounded-full h-1.5">
-        <div class="bg-green-500 h-1.5 rounded-full transition-all duration-500" :style="{ width: runProgress + '%' }"></div>
-      </div>
+    <div v-if="false" class="mb-6 p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
     </div>
 
     <!-- Error -->
@@ -251,11 +233,22 @@ function doneEditing() {
             <div class="flex items-center justify-between">
               <span class="text-white text-sm">{{ sub.query_text }}</span>
               <div class="flex items-center gap-2">
+                <button
+                  @click="runSubPipeline(sub.id, 'topic')"
+                  :disabled="runningSubs.has(sub.id)"
+                  class="px-2 py-1 bg-green-700 hover:bg-green-600 disabled:opacity-50 text-white text-xs rounded transition">
+                  {{ runningSubs.has(sub.id) ? '运行中...' : '立即运行' }}
+                </button>
                 <span :class="sub.status === 'active' ? 'text-green-400' : 'text-zinc-500'" class="text-xs">
                   {{ sub.status === 'active' ? '活跃' : '暂停' }}
                 </span>
                 <button @click="deleteTopic(sub.id)" class="text-xs text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition">删除</button>
               </div>
+            </div>
+            <!-- Run status -->
+            <div v-if="subRunStatus[sub.id]" class="mt-1.5 text-xs"
+              :class="subRunStatus[sub.id].startsWith('完成') ? 'text-green-400' : subRunStatus[sub.id].includes('未找到') ? 'text-yellow-400' : 'text-blue-400'">
+              {{ subRunStatus[sub.id] }}
             </div>
             <div v-if="sub.ai_keywords?.length" class="flex flex-wrap gap-1 mt-1.5">
               <span v-for="kw in sub.ai_keywords" :key="kw" class="px-1.5 py-0.5 bg-blue-900/30 text-blue-300 text-xs rounded">
@@ -329,9 +322,9 @@ function doneEditing() {
         </div>
       </section>
 
-      <div v-if="topicSubs.length > 0 && briefs.length === 0 && !runStatus" class="text-center py-10">
+      <div v-if="topicSubs.length > 0 && briefs.length === 0 && Object.keys(subRunStatus).length === 0" class="text-center py-10">
         <p class="text-zinc-500 text-sm mb-2">还没有简报</p>
-        <p class="text-zinc-600 text-xs">点击上方「运行 Pipeline」生成第一份每日简报</p>
+        <p class="text-zinc-600 text-xs">点击领域卡片上的「立即运行」生成每日简报</p>
       </div>
     </template>
   </div>
