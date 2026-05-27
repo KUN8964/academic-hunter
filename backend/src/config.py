@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     deepseek_model: str = "deepseek-chat"
 
     # AI scoring thresholds
-    ai_score_threshold: float = 6.0
+    ai_score_threshold: float = 3.0  # Lower = more papers pass (was 6.0)
     credibility_high_threshold: float = 8.0
     credibility_medium_threshold: float = 5.0
 
