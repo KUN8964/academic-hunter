@@ -35,6 +35,9 @@ const selectedSubs = ref<Set<string>>(new Set())
 const runningSubs = ref<Set<string>>(new Set())
 const subRunStatus = ref<Record<string, string>>({})
 
+// Researcher collapse
+const showAllResearchers = ref(false)
+
 // Tag editing
 const editingTag = ref<string | null>(null)
 const newTag = ref('')
@@ -232,11 +235,17 @@ function doneEditing() { editingTag.value = null; newTag.value = '' }
         </div>
       </section>
 
-      <!-- Researcher subscriptions -->
+      <!-- Researcher subscriptions (collapsed) -->
       <section v-if="researcherSubs.length > 0" class="mb-8">
-        <h2 class="text-lg font-semibold text-zinc-300 mb-4">研究者追踪 ({{ researcherSubs.length }})</h2>
+        <h2 class="text-lg font-semibold text-zinc-300 mb-4"
+          @click="showAllResearchers = !showAllResearchers"
+          style="cursor:pointer">
+          研究者追踪 ({{ researcherSubs.length }})
+          <span class="text-xs text-zinc-500 ml-1">{{ showAllResearchers ? '▲ 收起' : '▼ 展开' }}</span>
+        </h2>
         <div class="grid gap-2">
-          <div v-for="sub in researcherSubs" :key="sub.id"
+          <template v-for="sub in (showAllResearchers ? researcherSubs : researcherSubs.slice(0, 5))" :key="sub.id">
+          <div
             @click="toggleSelect(sub.id)"
             class="p-3 rounded-lg border cursor-pointer transition group"
             :class="selectedSubs.has(sub.id) ? 'bg-blue-950/30 border-blue-700' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'">
@@ -272,6 +281,7 @@ function doneEditing() { editingTag.value = null; newTag.value = '' }
               <span v-if="getLatestBriefDate(sub.id)" class="ml-3">最新论文 {{ getLatestBriefDate(sub.id) }}</span>
             </div>
           </div>
+          </template>
         </div>
       </section>
 
