@@ -262,11 +262,9 @@ class PipelineService:
             except Exception:
                 continue
 
-        # 4. Filter by threshold and sort
-        threshold = settings.ai_score_threshold
-        qualified = [p for p in scored_papers if p.credibility_score and p.credibility_score >= threshold]
-        qualified.sort(key=lambda x: x.credibility_score or 0, reverse=True)
-        top_papers = qualified[: settings.brief_max_papers]
+        # 4. Sort by credibility and take top papers (no absolute threshold)
+        scored_papers.sort(key=lambda x: x.credibility_score or 0, reverse=True)
+        top_papers = scored_papers[: settings.brief_max_papers]
 
         # 5. Generate brief (skip AI if no key)
         if self.ai.api_key:
